@@ -1,10 +1,11 @@
 # Grace
 
-The name stands for Generic Risk Assessment and Cancer Evaluation
+optimizing grace's ML algorithms.
 
-to run the program the "javaFX" and "javaCSV" libraries are needed 
+to build the project the "javaFX" and "javaCSV" libraries are required.
+download them and set them up as user libraries (eclipse).
 https://openjfx.io/;
 https://www.csvreader.com/java_csv.php
 
-these are the parameters needed in the java build config vm
+These are the parameters needed in the java build config vm to correctly build the project.
 --module-path "%PATH_TO_JAVAFX%\lib" --add-modules javafx.controls,javafx.fxml
