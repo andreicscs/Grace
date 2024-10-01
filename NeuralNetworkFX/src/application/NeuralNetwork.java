@@ -39,7 +39,9 @@
 	based on the architecture of the NN.
 	
 	By organizing weights and biases into arrays and matrices, it becomes easier to implement parallel computations. 
-	Libraries like OpenMP for multithreading or CUDA for GPU acceleration can efficiently handle these operations on matrices
+	Libraries like OpenMP for multithreading or CUDA for GPU acceleration can efficiently handle these operations on matrices.
+	
+	
 */
 
 
@@ -58,32 +60,73 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 
 
 public class NeuralNetwork implements Serializable{
 
 	private static final long serialVersionUID = 972856922459233840L;
 	
-	private List<List<Neuron>> layers;
+	private final int[] architecture;
+    private final Matrix[] weights;
+    private final Matrix[] biases;
+    private final Matrix[] outputs;
+    private final Matrix[] activations;
+    private final int layerCount;
+
+	
 	private double learningRate;
-	private int nWeightsXNeuron;
 	//private double momentumFactor; // Represents how much of the momentum is retained ( to be implemented)
 
-	public NeuralNetwork() {
-		super();
-		this.layers = new ArrayList<List<Neuron>>();
-		this.learningRate=0.5d;
-		// this.momentumFactor=0.0d;	commenting the momentumFactori because we are not considering it now
-
-	}
 	
-	public int getnWeightsXNeuron() {
-		return nWeightsXNeuron;
+	// !TO DO check if initialization is correct
+	public NeuralNetwork(int[] architecture) {
+		super();
+		this.architecture = architecture;
+		this.layerCount = architecture.length;
+		this.weights = new Matrix[layerCount - 1];
+		this.biases = new Matrix[layerCount - 1];
+		this.activations = new Matrix[layerCount - 1];
+		this.outputs = new Matrix[layerCount - 1];
+		
+		
+		weights[0] = new Matrix(architecture[0], architecture[0]);
+	    biases[0] = new Matrix(1, architecture[0]);
+	    outputs[0] = new Matrix(1, architecture[0]);
+	    activations[0] = new Matrix(1, architecture[0]);
+	    initializeMatrix(weights[0], 1);
+	    initializeMatrix(biases[0], 0);
+	    initializeMatrix(outputs[0], 0);
+	    initializeMatrix(activations[0], 0);
+	    
+	    Random rand = new Random();
+		for (int i = 1; i < layerCount - 1; i++) {
+		    weights[i] = new Matrix(architecture[i], architecture[i]);
+		    biases[i] = new Matrix(1, architecture[i]);
+		    outputs[i] = new Matrix(1, architecture[i]);
+		    activations[i] = new Matrix(1, architecture[i]);
+		    
+		    initializeMatrixRand(weights[i], rand);
+		    initializeMatrixRand(biases[i], rand);
+		    initializeMatrix(outputs[i], 0);
+		    initializeMatrix(activations[i], 0);
+		}
+		this.learningRate=0.5d;
 	}
-
-	public void setnWeightsXNeuron(int nWeightsXNeuron) {
-		this.nWeightsXNeuron = nWeightsXNeuron;
-	}
+	private void initializeMatrixRand(Matrix matrix, Random rand) {
+        for (int i = 0; i < matrix.rows; i++) {
+            for (int j = 0; j < matrix.cols; j++) {
+                matrix.elements[i][j] = rand.nextGaussian(); // Random values from a normal distribution
+            }
+        }
+    }
+	private void initializeMatrix(Matrix matrix, double d) {
+        for (int i = 0; i < matrix.rows; i++) {
+            for (int j = 0; j < matrix.cols; j++) {
+                matrix.elements[i][j] = d; // Random values from a normal distribution
+            }
+        }
+    }
 	public double getLearning_rate() {
 		return learningRate;
 	}
@@ -92,108 +135,34 @@ public class NeuralNetwork implements Serializable{
 		this.learningRate = learningRate;
 	}
 	
-	public List<List<Neuron>> getLayers() {
-		return layers;
-	}
-
-	/**
-	 * Giving the nn a full list of layers to set all the layers
-	 * @param layers the layers to add
-	 */
-	public void setLayers(List<List<Neuron>> layers) {
-		this.layers = layers;
-	}
 
 	
 	
-	public void addLayer() {
-		this.layers.add(new ArrayList<Neuron>());
-	}
-	
-	/**
-	 * Adding a layer to the NN
-	 * @param nNeurons the number of Neurons to add
-	 * @param activationFunction the activation function of the neuron of the created layer
-	 */
-	public void addLayer(int nNeurons, String activationFunction) {
-		this.layers.add(new ArrayList<Neuron>());
-		for(int i=0;i<nNeurons;i++) {
-			this.addNeuronToLayer(layers.size()-1, activationFunction);
-		}
-	}
-	
-	/**
-	 * Adding a layer to the NN
-	 * @param nNeurons the number of Neurons to add
-	 */
-	public void addLayer(int nNeurons) {	
-		this.layers.add(new ArrayList<Neuron>());
-		for(int i=0;i<nNeurons;i++) {
-			this.addNeuronToLayer(layers.size()-1, null);
-		}
-	}
-	
-	public void addNeuronToLayer(int layerIndex, String activationFunction) {
-		if(layerIndex == 0)
-			this.layers.get(layerIndex).add(new InputNeuron());
-		else
-			this.layers.get(layerIndex).add(new RegularNeuron(this.layers.get(layerIndex - 1).size(), activationFunction));
-	}
-	
-	/**
-	 * 
-	 * @param inputs a list of all the inputs to give to the inputs layer
-	 * @return the output of the neural network
-	 */
-	public List<Double> forward(List<Double> inputs) {
-		List<Double> currentInputs = new ArrayList<>(inputs);
-	    double neuronOutput;
-	    List<Double> neuronInputs;
-	    for (List<Neuron> layer : this.layers) {
-	    	List<Double> layerOutputs = new ArrayList<>();
-	        if(this.layers.indexOf(layer)==0) {
-		        int neuronIndex = 0;
-				for (Neuron neuron : layer) {
-					// Just for the input layer every neuron gets one input each.
-			    	// Extract the inputs for the current neuron
-					neuronInputs = List.of(currentInputs.get(neuronIndex));
-					neuronOutput = neuron.calculate(neuronInputs);
-			        layerOutputs.add(neuronOutput);
-					neuronIndex++;
-		        }	
-	        }else {
-	        	for (Neuron neuron : layer) {
-	        		// other layer's neurons get every previous neuron's output as input each.
-			        neuronOutput = neuron.calculate(currentInputs);
-			        layerOutputs.add(neuronOutput);
-			        neuron.setOutput(neuronOutput);
-		        }	   
-	        }
-	        // Update inputs for the next layer
-	        currentInputs = layerOutputs;
-	    }
-	    return currentInputs; // Return the output of the last layer
-	}
-	
-	/**
-	 * 
-	 * 
-	 * @param trainingData a list of all the training data
-	 * @param outTrainingData a list of all the expected output
-	 * @return an average of all the distances from the expected output and the actual output ( loss)
-	 */
-	public double lossAverage(List<List<Double>> trainingData, List<List<Double>> outTrainingData) {
-	    double result = 0.0d;
-	    int trainCount = trainingData.size();
-	    for (int i = 0; i < trainCount; ++i) {
-	    	List<Double> output = forward(trainingData.get(i));
-	    	for(int k=0; k<output.size(); k++) {
-	    		result+=loss(output.get(k), outTrainingData.get(i).get(k));
-	    	}	
+	// !TO DO check if forward is correct
+	// Forward propagation method
+    public void forward(Matrix input) {
+    	activations[0] = input;
+        for (int i = 0; i < layerCount - 1; i++) {
+        	activations[i+1] = Matrix.multiply(activations[i], weights[i]);
+            activations[i+1].add(biases[i]);
+            outputs[i+1]=activations[i+1];
+            activations[i+1] = applyActivation(activations[i+1]);
         }
-	    result /= (trainingData.size());
-	    return result;
-	}
+    }
+    
+    private Matrix applyActivation(Matrix matrix) {
+        Matrix activated = new Matrix(matrix.rows, matrix.cols);
+        for (int i = 0; i < matrix.rows; i++) {
+            for (int j = 0; j < matrix.cols; j++) {
+                activated.elements[i][j] = sigmoid(matrix.elements[i][j]);
+            }
+        }
+        return activated;
+    }
+    
+    private double sigmoid(double x) {
+        return 1.0 / (1.0 + Math.exp(-x));
+    }
 	
 	/**
 	 * This function calculate the value of the loss
@@ -221,11 +190,18 @@ public class NeuralNetwork implements Serializable{
         return error;
 	}
 	
+	
+	
+	
+	// !TO DO implement backpropagation
+	
+	
 	/**
 	 * This function is used to propagate the error of the output layer to all the hidden layers
 	 * 
 	 * @param expectedOutput the output that we expect from the neural network
 	 */
+	/*
 	public void backPropagation(List<Double> expectedOutput) {
 		List<List<Double>> curLayerInGradients = new ArrayList<>();	// to store the current layer's gradients of the input which will be used in the next layer to apply the chain rule
 		for(int i = this.getLayers().size() - 1; i>0; --i) {
@@ -282,29 +258,9 @@ public class NeuralNetwork implements Serializable{
 		}
 	}
 	
-	/**
-	 * This function is used to update weight and biases using each gradient calculated with the chain rule
-	 * 
-	 * @param trainCount the number of the train iterations
-	 */
-	private void updateWeightsAndBiases(int trainCount) {
-	    // Update weights and biases
-	    for (int i = 1; i < this.layers.size(); ++i) {
-	        for (Neuron currentNeuron : this.layers.get(i)) {
-	            List<Double> curNeuronWeights = currentNeuron.getWeights();
-	            List<Double> curNeuronWeightsGradients = currentNeuron.getWeightsGradient();
-	            for (int j = 0; j < curNeuronWeights.size(); ++j) {
-	                curNeuronWeightsGradients.set(j, curNeuronWeightsGradients.get(j) / trainCount);
-	                curNeuronWeights.set(j, curNeuronWeights.get(j) - (curNeuronWeightsGradients.get(j) * learningRate));
-	                curNeuronWeightsGradients.set(j,0d);
-	            }
-	            currentNeuron.setBiasGradient(currentNeuron.getBiasGradient() / trainCount);
-	            currentNeuron.setBias(currentNeuron.getBias() - (currentNeuron.getBiasGradient() * learningRate));
-	            currentNeuron.setBiasGradient(0d);
-	        }
-	    }
-	}
 	
+	
+	// !TO DO rewrite train method using matrix as input/expected output.
 	/**
 	 * This function trains the neural network
 	 * batch gradient descent
@@ -319,10 +275,8 @@ public class NeuralNetwork implements Serializable{
 	        // Forward pass
 	        forward(trainingData.get(i));
 	        // Backword pass
-	        backPropagation(outTrainingData.get(i));
+	        //backPropagation(outTrainingData.get(i));
 	    }
-	    // Update weights and biases
-	    updateWeightsAndBiases(trainCount);
 	}
 	
 	/**
@@ -398,6 +352,7 @@ public class NeuralNetwork implements Serializable{
 	 * @param expectedOutputs The outputs that we expect from the neural network
 	 * @return A list of all the calculated guess of the neural network
 	 */
+	/*
 	public List<Double> nnGuessing(List<List<Double>> inputs, List<Double> expectedOutputs){
 		List<Double> calculatedOutputGuess = null;
 		if(NeuralNetwork.loadState() != null)
@@ -428,7 +383,7 @@ public class NeuralNetwork implements Serializable{
 			System.out.println("Impossibile fare il guessing da una rete neurale non trainata");
 		return calculatedOutputGuess;
 	}
-	
+	*/
 	/**
 	 * 
 	 * This function is used to make a trained neural network make calculated guesses on given inputs
@@ -436,6 +391,7 @@ public class NeuralNetwork implements Serializable{
 	 * @param inputs The inputs that the neural network need to do the guessing on
 	 * @return A list of all the calculated guess of the neural network
 	 */
+	/**
 	public List<List<Double>> nnGuessing(List<List<Double>> inputs){
 		List<List<Double>> calculatedOutputGuess = null;
 		if(NeuralNetwork.loadState() != null)
@@ -452,5 +408,5 @@ public class NeuralNetwork implements Serializable{
 			System.out.println("Impossibile fare il guessing da una rete neurale non trainata");
 		return calculatedOutputGuess;
 	}
-
+	*/
 }
