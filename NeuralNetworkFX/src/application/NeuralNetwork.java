@@ -8,6 +8,43 @@
  * */
 
 
+/*
+		WHAT TO CHANGE:
+	Weights:
+		The weights will be stored in an array of matrices:
+		L_i = layers
+		N_i = neurons
+		W_i = weights
+		
+	Biases:
+		The biases will be stored in an array of arrays
+		
+	Activations:
+		Activations (activated neurons outputs) will be stored in an array of arrays.
+		
+	Outputs:
+		Outputs(pre-activated neurons outputs, plain output or Z) will be stored in an array of arrays. 
+		//used to apply the chain rule
+		
+	Architecture:
+		The architecture will be declared by a vector, each column will represent a layer and its value will represent how many neurons that layer has.
+		Ex:
+			Int[] arch = {2,10,10,5,1};
+			Represents the following architecture:
+			2 neurons in the input layer, 10 neurons in the first hidden layer… 1 neuron in the output layer, for a total of 5 layers (arch.size).
+	
+	Arrays of arrays/matrices are used instead of directly using matrices or 3d matrices because 
+	each layer can have different sizes, and the neuron's weights too. 
+	So by using an array of matrices each layer can have a Dynamically allocated matrix 
+	based on the architecture of the NN.
+	
+	By organizing weights and biases into arrays and matrices, it becomes easier to implement parallel computations. 
+	Libraries like OpenMP for multithreading or CUDA for GPU acceleration can efficiently handle these operations on matrices
+*/
+
+
+
+
 // TO DO!!! not finished
 
 package application;
