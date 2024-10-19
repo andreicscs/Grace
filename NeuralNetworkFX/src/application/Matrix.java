@@ -11,6 +11,30 @@ public class Matrix {
         this.elements = new double[rows][cols];
     }
 
+    public int getRows() {
+        return rows;
+    }
+
+    public void setRows(int rows) {
+        this.rows = rows;
+    }
+
+    public int getCols() {
+        return cols;
+    }
+
+    public void setCols(int cols) {
+        this.cols = cols;
+    }
+
+    public double[][] getElements() {
+        return elements;
+    }
+
+    public void setElements(double[][] elements) {
+        this.elements = elements;
+    }
+
     public static Matrix multiply(Matrix a, Matrix b) {
         if (a.cols != b.rows) throw new IllegalArgumentException("Matrix dimensions do not match for multiplication.");
         Matrix result = new Matrix(a.rows, b.cols);
@@ -33,5 +57,17 @@ public class Matrix {
         }
     }
 
-    // Additional methods for filling, printing, etc.
+    public Matrix getSubMatrix(int startRow, int startCol, int numRows, int numCols) {
+        if (startRow < 0 || startRow + numRows > rows || startCol < 0 || startCol + numCols > cols) {
+            throw new IllegalArgumentException("Submatrix dimensions are out of bounds.");
+        }
+        
+        Matrix subMatrix = new Matrix(numRows, numCols);
+        for (int i = 0; i < numRows; i++) {
+            for (int j = 0; j < numCols; j++) {
+                subMatrix.elements[i][j] = this.elements[startRow + i][startCol + j];
+            }
+        }
+        return subMatrix;
+    }
 }

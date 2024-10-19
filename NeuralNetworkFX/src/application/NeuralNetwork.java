@@ -67,13 +67,14 @@ public class NeuralNetwork implements Serializable{
 
 	private static final long serialVersionUID = 972856922459233840L;
 	
-	private final int[] architecture;
-    private final Matrix[] weights;
-    private final Matrix[] biases;
-    private final Matrix[] outputs;
-    private final Matrix[] activations;
-    private final int layerCount;
-
+	private int[] architecture;
+    private Matrix[] weights;
+    private Matrix[] biases;
+    private Matrix[] outputs;
+    private Matrix[] activations;
+    private int layerCount;
+    private String hiddenLayersAF;
+    private String outputLayerAF;
 	
 	private double learningRate;
 	//private double momentumFactor; // Represents how much of the momentum is retained ( to be implemented)
@@ -112,6 +113,10 @@ public class NeuralNetwork implements Serializable{
 		    initializeMatrix(activations[i], 0);
 		}
 		this.learningRate=0.5d;
+		
+		// default to relu for hiudden layers and sig for output layer can be changed using set...().
+		this.hiddenLayersAF="rel";
+		this.outputLayerAF="sig";
 	}
 	private void initializeMatrixRand(Matrix matrix, Random rand) {
         for (int i = 0; i < matrix.rows; i++) {
@@ -146,15 +151,19 @@ public class NeuralNetwork implements Serializable{
         	activations[i+1] = Matrix.multiply(activations[i], weights[i]);
             activations[i+1].add(biases[i]);
             outputs[i+1]=activations[i+1];
-            activations[i+1] = applyActivation(activations[i+1]);
+            activations[i+1] = applyActivation(activations[i+1], i);
         }
     }
     
-    private Matrix applyActivation(Matrix matrix) {
+    private Matrix applyActivation(Matrix matrix, int iLayer) {
         Matrix activated = new Matrix(matrix.rows, matrix.cols);
         for (int i = 0; i < matrix.rows; i++) {
             for (int j = 0; j < matrix.cols; j++) {
-                activated.elements[i][j] = sigmoid(matrix.elements[i][j]);
+            	if(iLayer+1==layerCount-1) {
+                    activated.elements[i][j] = activationFunction(matrix.elements[i][j], this.outputLayerAF);
+                }else {
+                	activated.elements[i][j] = activationFunction(matrix.elements[i][j], this.hiddenLayersAF);
+                }
             }
         }
         return activated;
@@ -163,7 +172,32 @@ public class NeuralNetwork implements Serializable{
     private double sigmoid(double x) {
         return 1.0 / (1.0 + Math.exp(-x));
     }
-	
+    
+	private double activationFunction(double x, String af){
+		switch(af) {
+			case "sig":
+				return sigmoid(x);
+			default:
+				break;
+		}
+		
+		return -1;
+	}
+    
+    private double AFDerivative(double x, String af) {
+    	
+    	switch(af) {
+		case "sig":
+			double sig = sigmoid(x);
+	        return sig * (1.0 - sig);
+		default:
+			break;
+		}
+		
+		return -1;
+    }
+    
+    
 	/**
 	 * This function calculate the value of the loss
 	 * 
@@ -194,6 +228,72 @@ public class NeuralNetwork implements Serializable{
 	
 	
 	// !TO DO implement backpropagation
+	
+	/**
+	 * This function is used to propagate the error of the output layer to all the hidden layers
+	 * 
+	 * @param expectedOutput the output that we expect from the neural network
+	 */
+	public void backPropagation(Matrix expectedOutput) {
+		for(int i = this.architecture.length - 1; i>0; --i) {
+	        List<Neuron> currentLayerNeurons = this.getLayers().get(i);
+	        List<Neuron> previousLayerNeurons = this.getLayers().get(i - 1);
+	        int neuronCount = currentLayerNeurons.size();
+	        int prevNeuronCount = previousLayerNeurons.size();
+
+			// Output layer
+			if(i == this.architecture.length - 1) {	
+				for(int j = 0; j<neuronCount;++j) {
+					Neuron currentNeuron=this.getLayers().get(i).get(j);
+					
+	                double curNoutput = this.outputs[i].getElements()[0][j];
+					double activatedCurNoutput = this.activations[i].getElements()[0][j];
+					double dLoss = lossDerivative(activatedCurNoutput,expectedOutput.getElements()[0][j]); // derivative of the loss function
+					double dActivationOnOutput = AFDerivative(curNoutput, this.outputLayerAF);	// derivative of the activation function with the non activated output as input  // !!! TO DO, implement different afderivative functions
+					double delta = dLoss*dActivationOnOutput;	// applying chain rule on the partial derivatives calculated up to now. Delta is the same for every weight of a given neuron.
+	                
+					
+					// !!!! TO DO implement the rest of back propagation, find a way to save the weight gradients (take in consideration creating a temp NeuralNetwork object to store the calculated gradients and update the actual NN)  
+					
+					List<Double> weightGradients = new ArrayList<>(Collections.nCopies(prevNeuronCount, 0.0));
+					for(int k = 0; k < prevNeuronCount; k++){
+						Neuron previousNeuron = previousLayerNeurons.get(k);	// taking the previous neuron that gives the weight the input
+						double weightGradient = delta * previousNeuron.activate(previousNeuron.getOutput());	// calculating the gradient using the derivative of l(S(Z))	
+						currentNeuron.setWeightGradient(k, currentNeuron.getWeightGradient(k) + weightGradient);	// setting the weightGradient of the current neuron
+	                    weightGradients.set(k, weightGradients.get(k) + delta * currentNeuron.getWeight(k));
+					}
+	                curLayerInGradients.add(weightGradients);
+					//	delta = biasGradient
+					currentNeuron.setBiasGradient(currentNeuron.getBiasGradient() + delta);
+				}	
+			}
+			else{ // Hidden layers
+	            List<List<Double>> prevLayerInGradients = new ArrayList<>(curLayerInGradients);	// to store the previous layer's gradients of the input
+	            curLayerInGradients.clear();
+
+				for(int j = 0; j<neuronCount;++j) {
+					Neuron currentNeuron=this.getLayers().get(i).get(j);
+					double dActivationOnOutput = currentNeuron.AFDerivative(currentNeuron.getOutput());	// derivative of the activation function with the non activated output as input
+					double prevLayerGradientSum = 0;
+					for(int k=0; k< prevLayerInGradients.size(); ++k) {
+						prevLayerGradientSum += prevLayerInGradients.get(k).get(j);	// considering the sum of the next layer input of the neuron considered
+					}
+					double delta = prevLayerGradientSum*dActivationOnOutput;	// chain rule on the partial derivatives calculated up to now. Delta is the same for every weight of a given neuron.
+	                List<Double> weightGradients = new ArrayList<>(Collections.nCopies(prevNeuronCount, 0.0));
+					for(int k = 0; k < prevNeuronCount; k++){
+						Neuron previousNeuron = previousLayerNeurons.get(k);	// taking the previous neuron that gives the weight the input
+						double weightGradient = delta * previousNeuron.activate(previousNeuron.getOutput());	// calculating the gradient using the derivative of l(S(Z))	
+						currentNeuron.setWeightGradient(k, currentNeuron.getWeightGradient(k) + weightGradient);
+	                    weightGradients.set(k, weightGradients.get(k) + delta * currentNeuron.getWeight(k));
+					}
+	                curLayerInGradients.add(weightGradients);
+	                // delta = biasGradient
+					currentNeuron.setBiasGradient(currentNeuron.getBiasGradient() + delta);
+				}
+			}
+		}
+	}
+	
 	
 	
 	/**
@@ -260,7 +360,7 @@ public class NeuralNetwork implements Serializable{
 	
 	
 	
-	// !TO DO rewrite train method using matrix as input/expected output.
+	// !TO DO check if forward function works
 	/**
 	 * This function trains the neural network
 	 * batch gradient descent
@@ -268,12 +368,18 @@ public class NeuralNetwork implements Serializable{
 	 * @param trainingData the inputs of the inputs layer
 	 * @param outTrainingData the expected output
 	 */
-	public void train(List<List<Double>> trainingData, List<List<Double>> outTrainingData) {
-		int trainCount=trainingData.size();
+	public void train(Matrix trainingData) {
+		int trainCount=trainingData.getCols()-1;// !!! TO DO - n of expected output in case of multiple output
+		
+		// set up a matrix for the input/output.
+		// all columns dedicated to input apart 
+		// from the last one which will be used 
+		// to store the expected output.
+		
 		// Loop over training examples
 	    for (int i = 0; i < trainCount; ++i) {
 	        // Forward pass
-	        forward(trainingData.get(i));
+	        forward(trainingData.getSubMatrix(i, 0, 1, trainCount));
 	        // Backword pass
 	        //backPropagation(outTrainingData.get(i));
 	    }
@@ -343,6 +449,7 @@ public class NeuralNetwork implements Serializable{
 		
 		return loadedNN;
 	}
+
 	
 	/**
 	 * 
@@ -409,4 +516,22 @@ public class NeuralNetwork implements Serializable{
 		return calculatedOutputGuess;
 	}
 	*/
+	
+	
+	
+	public String getHiddenLayersAF() {
+		return HiddenLayersAF;
+	}
+	public void setHiddenLayersAF(String hiddenLayersAF) {
+		HiddenLayersAF = hiddenLayersAF;
+	}
+	public String getOutputLayerAF() {
+		return OutputLayerAF;
+	}
+	public void setOutputLayerAF(String outputLayerAF) {
+		OutputLayerAF = outputLayerAF;
+	}
+	
+	
+	
 }

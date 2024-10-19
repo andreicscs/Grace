@@ -29,94 +29,22 @@ public class DrawingPanel extends StackPane{
 		thread1 = new Thread(new Runnable() {
 	            @Override
 				public void run() {
-	            	NeuralNetwork scervelo = new NeuralNetwork();
-	            	ArrayList<List<Double>> TrainIn = new ArrayList<>();
-	            	ArrayList<List<Double>> TrainOut = new ArrayList<>();
-	        		ArrayList<List<Double>> GuessIn = new ArrayList<>();
-	        		ArrayList<Double> GuessOut = new ArrayList<Double>();
-	            	File nnData = new File("savedNN.dat");
-	            	int i;
-
-	        		
-	            	if(!toTrain && nnData.exists())
-	            		scervelo = NeuralNetwork.loadState();
-	        		
-	        		
-	            	CsvReader dataset = DataReader.getCSV("dataset.csv");
-	            	ArrayList<Cancer> data = new ArrayList<Cancer>();
-		
-					// for debugging purpose only
-					//System.out.println(dataset.toString());
-					
-					try {
-						
-						dataset.readHeaders();	// reading the headers of the csv
-						
-						while (dataset.readRecord()) {	// populating the cancers dataset
-							data.add(new Cancer(dataset.get("id"), dataset.get("diagnosis"), Float.parseFloat(dataset.get("radius_mean")), Float.parseFloat(dataset.get("texture_mean")), 
-									Float.parseFloat(dataset.get("perimeter_mean")), Float.parseFloat(dataset.get("area_mean")), Float.parseFloat(dataset.get("smoothness_mean")),
-									Float.parseFloat(dataset.get("compactness_mean")), Float.parseFloat(dataset.get("concavity_mean")), Float.parseFloat(dataset.get("concave points_mean")),
-									Float.parseFloat(dataset.get("symmetry_mean")), Float.parseFloat(dataset.get("fractal_dimension_mean")), Float.parseFloat(dataset.get("radius_se")),
-									Float.parseFloat(dataset.get("texture_se")), Float.parseFloat(dataset.get("perimeter_se")), Float.parseFloat(dataset.get("area_se")), Float.parseFloat(dataset.get("smoothness_se")),
-									Float.parseFloat(dataset.get("compactness_se")), Float.parseFloat(dataset.get("concavity_se")), Float.parseFloat(dataset.get("concave points_se")),
-									Float.parseFloat(dataset.get("symmetry_se")), Float.parseFloat(dataset.get("fractal_dimension_se")), Float.parseFloat(dataset.get("radius_worst")),
-									Float.parseFloat(dataset.get("texture_worst")), Float.parseFloat(dataset.get("perimeter_worst")), Float.parseFloat(dataset.get("area_worst")),
-									Float.parseFloat(dataset.get("smoothness_worst")), Float.parseFloat(dataset.get("compactness_worst")), Float.parseFloat(dataset.get("concavity_worst")),
-									Float.parseFloat(dataset.get("concave points_worst")), Float.parseFloat(dataset.get("symmetry_worst")), Float.parseFloat(dataset.get("fractal_dimension_worst"))));
-						}
-					} catch (NumberFormatException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-					
-					dataset.close();
-	        		
-	        		// setting up all the training data for the nn to use
-	        		for(i = 0; i < data.size()-50; i++) {
-	        			double diagnosis;
-	        			
-	        			if("M".equals(data.get(i).getDiagnosis()))
-	        				diagnosis = 0;
-	        			else
-	        				diagnosis = 1;
-	        			
-	        			TrainOut.add(List.of(diagnosis));
-	        			TrainIn.add(data.get(i).getAllNormalizedData());
-	        			
-	        			// for debugging purpose only
-	        			//System.out.println("first training data: " + TrainIn.get(i).toString());
-	        			//System.out.println("number of inputs: " + TrainIn.get(i).size());
-	        		}
-	        		
-	        		// setting up the guess data
-	        		for(i++; i < data.size(); i++) {
-	        			double diagnosis;
-	        			
-	        			if("M".equals(data.get(i).getDiagnosis()))
-	        				diagnosis = 0;
-	        			else
-	        				diagnosis = 1;
-	        			
-	        			GuessOut.add(diagnosis);
-	        			GuessIn.add(data.get(i).getAllNormalizedData());
-	        			
-	        			// for debugging purpose only
-	        			//System.out.println("first training data: " + TrainIn.get(i).toString());
-	        			//System.out.println("number of inputs: " + TrainIn.get(i).size());
-	        		}
-	        		
 	            	
-	        		
-
+	            	int[] architecture= {2,4,2,1};
+	            	
+	            	NeuralNetwork scervelo = new NeuralNetwork(architecture);
+	            	
+	            	Matrix trainingData = new Matrix(2,3);
+	            	
+	            	
+	            	File nnData = new File("savedNN.dat");
+	            	
 	        		if(toTrain) {
 	        			double startTime = System.currentTimeMillis();
 	        			double endTime;
 	        			double elapsedTime;
-	        			for(i=0; i<3000; ++i) {
-		        			scervelo.train(TrainIn, TrainOut);
+	        			for(int i=0; i<3000; ++i) {
+		        			scervelo.train(trainingData);
 		        			// DEBUG
 		        			if(i%100==0) {
 		        				endTime = System.currentTimeMillis();
@@ -126,15 +54,9 @@ public class DrawingPanel extends StackPane{
 		        			}
 	        				
 		        		}
-	        		} else {
+	        		}else if(nnData.exists()) {
+	        			scervelo = NeuralNetwork.loadState();
 	        		}
-	        	
-	        		
-	        		/*
-	        		 * 
-	        		 * DEBUGGING
-	        		 * 
-	        		*/
 	            }
            });
 	}
