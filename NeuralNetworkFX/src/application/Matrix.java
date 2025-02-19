@@ -70,4 +70,21 @@ public class Matrix {
         }
         return subMatrix;
     }
+    
+    public static Matrix transpose(Matrix matrix) {
+        int rows = matrix.getRows();
+        int cols = matrix.getCols();
+        Matrix transposed = new Matrix(cols, rows);
+        
+        // Transpose the matrix by swapping rows and columns
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                transposed.getElements()[j][i] = matrix.getElements()[i][j];
+            }
+        }
+        
+        return transposed;
+    }
+
+    
 }

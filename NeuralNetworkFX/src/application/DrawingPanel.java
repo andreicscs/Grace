@@ -33,8 +33,9 @@ public class DrawingPanel extends StackPane{
 	            	int[] architecture= {2,4,2,1};
 	            	
 	            	NeuralNetwork scervelo = new NeuralNetwork(architecture);
+	            	scervelo.debugMatrixDimensions();
 	            	
-	            	Matrix trainingData = new Matrix(2,3);
+	            	Matrix trainingData = new Matrix(3,3);
 	            	
 	            	
 	            	File nnData = new File("savedNN.dat");
@@ -43,8 +44,9 @@ public class DrawingPanel extends StackPane{
 	        			double startTime = System.currentTimeMillis();
 	        			double endTime;
 	        			double elapsedTime;
+	        			
 	        			for(int i=0; i<3000; ++i) {
-		        			scervelo.train(trainingData);
+		        			scervelo.train(trainingData, 1, 1);
 		        			// DEBUG
 		        			if(i%100==0) {
 		        				endTime = System.currentTimeMillis();
