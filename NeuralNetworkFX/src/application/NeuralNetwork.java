@@ -70,17 +70,17 @@ public class NeuralNetwork implements Serializable{
 
 	private static final long serialVersionUID = 972856922459233840L;
 	
-	private int[] architecture;
-    private Matrix[] weights;
-    private Matrix[] biases;
-    private Matrix[] weightsGradients;
-    private Matrix[] biasesGradients;
-    private Matrix[] inputGradients;
-    private Matrix[] outputs;
-    private Matrix[] activations;
-    private int layerCount;
-    private String hiddenLayersAF;
-    private String outputLayerAF;
+	int[] architecture;
+    Matrix[] weights;
+    Matrix[] biases;
+    Matrix[] weightsGradients;
+    Matrix[] biasesGradients;
+    Matrix[] inputGradients;
+    Matrix[] outputs;
+    Matrix[] activations;
+    int layerCount;
+    String hiddenLayersAF;
+    String outputLayerAF;
 	
 	private double learningRate;
 	//private double momentumFactor; // Represents how much of the momentum is retained ( to be implemented)
@@ -99,13 +99,15 @@ public class NeuralNetwork implements Serializable{
 		this.activations = new Matrix[layerCount];
 		this.outputs = new Matrix[layerCount];
 		
-		weights[0] = new Matrix(architecture[0], 1);
-	    biases[0] = new Matrix(architecture[0], 1);
-	    weightsGradients[0] = new Matrix(architecture[0], 1);
-	    biasesGradients[0] = new Matrix(architecture[0], 1);
-	    inputGradients[0] = new Matrix(architecture[0], 1);
-	    outputs[0] = new Matrix(architecture[0], 1);
-	    activations[0] = new Matrix(architecture[0], 1);
+		weights[0] = new Matrix(1, architecture[0]);
+	    biases[0] = new Matrix(1, architecture[0]);
+	    
+	    weightsGradients[0] = new Matrix(1, architecture[0]);
+	    biasesGradients[0] = new Matrix(1, architecture[0]);
+	    inputGradients[0] = new Matrix(1, architecture[0]);
+	    
+	    outputs[0] = new Matrix(1, architecture[0]);
+	    activations[0] = new Matrix(1, architecture[0]);
 	    
 	    initializeMatrix(weights[0], 1);
 	    initializeMatrix(biases[0], 0);
@@ -116,22 +118,22 @@ public class NeuralNetwork implements Serializable{
 	    
 	    Random rand = new Random();
 		for (int i = 1; i < layerCount; i++) {
-		    weights[i] = new Matrix(architecture[i], architecture[i-1]);
-		    biases[i] = new Matrix(architecture[i], 1);
-		    weightsGradients[i] = new Matrix(architecture[i], architecture[i-1]);
-		    biasesGradients[i] = new Matrix(architecture[i], 1);
-		    inputGradients[i] = new Matrix(architecture[i], architecture[i-1]);
-		    outputs[i] = new Matrix(architecture[i], 1);
-		    activations[i] = new Matrix(architecture[i], 1);
+		    weights[i] = new Matrix(architecture[i-1], architecture[i]);
+		    biases[i] = new Matrix(1, architecture[i]);
+		    weightsGradients[i] = new Matrix(architecture[i-1], architecture[i]);
+		    biasesGradients[i] = new Matrix(1, architecture[i]);
+		    inputGradients[i] = new Matrix(architecture[i-1], architecture[i]);
+		    outputs[i] = new Matrix(1, architecture[i]);
+		    activations[i] = new Matrix(1, architecture[i]);
 		    
-		    initializeMatrixRand(weights[i], rand); // !! TO DO check if the random initialization is correct
+		    initializeMatrixRand(weights[i], rand);
 		    initializeMatrixRand(biases[i], rand);
 		    initializeMatrix(weightsGradients[i], 0);
 		    initializeMatrix(biasesGradients[i], 0);
 		    initializeMatrix(outputs[i], 0);
 		    initializeMatrix(activations[i], 0);
 		}
-		this.learningRate=0.5d;
+		this.learningRate=0.01d;
 		
 		// default to relu for hiudden layers and none for output layer can be changed using set...().
 		this.hiddenLayersAF="rel";
@@ -142,15 +144,16 @@ public class NeuralNetwork implements Serializable{
 	public void debugMatrixDimensions() {
 	    for (int i = 0; i < layerCount; i++) {
 	        System.out.println("Layer " + i);
-	        System.out.println("Weights: " + weights[i].cols + " cols x " + weights[i].rows + " rows");
-	        System.out.println("Biases: " + biases[i].cols + " cols x " + biases[i].rows + " rows");
-	        System.out.println("Weights Gradients: " + weightsGradients[i].cols + " cols x " + weightsGradients[i].rows + " rows");
-	        System.out.println("Biases Gradients: " + biasesGradients[i].cols + " cols x " + biasesGradients[i].rows + " rows");
-	        System.out.println("Outputs: " + outputs[i].cols + " cols x " + outputs[i].rows + " rows");
-	        System.out.println("Activations: " + activations[i].cols + " cols x " + activations[i].rows + " rows");
+	        System.out.println("Weights: " + weights[i].rows + " rows x " + weights[i].cols + " cols");
+	        System.out.println("Biases: " + biases[i].rows + " rows x " + biases[i].cols + " cols");
+	        System.out.println("Weights Gradients: " + weightsGradients[i].rows + " rows x " + weightsGradients[i].cols + " cols");
+	        System.out.println("Biases Gradients: " + biasesGradients[i].rows + " rows x " + biasesGradients[i].cols + " cols");
+	        System.out.println("Outputs: " + outputs[i].rows + " rows x " + outputs[i].cols + " cols");
+	        System.out.println("Activations: " + activations[i].rows + " rows x " + activations[i].cols + " cols");
 	        System.out.println();
 	    }
 	}
+
 	
 	
 	/**
@@ -179,16 +182,19 @@ public class NeuralNetwork implements Serializable{
 	// TO DO non funge, controllare operazioni tra matrici.
 	// Forward propagation method
     public void forward(Matrix input) {
-    	activations[0] = Matrix.transpose(input);
+    	activations[0] = input;
     	outputs[0] = activations[0];
 
-        for (int i = 0; i < layerCount - 1; i++) {
-        	System.out.println(i+" Activations: " + activations[i].cols + " cols x " + activations[i].rows + " rows");
-        	activations[i+1] = Matrix.multiply(activations[i], Matrix.transpose(weights[i]));
-        	System.out.println(i+1+" Activations: " + activations[i+1].cols + " cols x " + activations[i+1].rows + " rows");
-            activations[i+1].add(biases[i]);
-            outputs[i+1]=activations[i+1];
-            activations[i+1] = applyActivation(activations[i+1], i);
+        for (int i = 1; i < layerCount; i++) {
+        	//System.out.println(i-1 + " Activations: " + activations[i-1].rows + " rows x " + activations[i-1].cols + " cols");
+        	//System.out.println(i + " Weights: " + Matrix.transpose(weights[i]).rows + " rows x " + Matrix.transpose(weights[i]).cols + " cols");
+
+        	activations[i] = Matrix.multiply(activations[i-1], weights[i]);
+        	//System.out.println(i + " Activations: " + activations[i].rows + " rows x " + activations[i].cols + " cols");
+
+        	activations[i].add(biases[i]);
+            outputs[i]=activations[i];
+            activations[i] = applyActivation(activations[i], i);
         }
         
     }
@@ -198,36 +204,36 @@ public class NeuralNetwork implements Serializable{
 	 * 
 	 * @param expectedOutput the output that we expect from the neural network
 	 */
-	public void backPropagation(Matrix expectedOutput) {
-	    for (int i = this.architecture.length - 1; i > 0; --i) {
-	        for (int j = 0; j < architecture[i]; ++j) {                    
-	            double curNoutput = this.outputs[i].getElements()[j][0];
-	            double dActivationOnOutput = AFDerivative(curNoutput, this.outputLayerAF); // derivative of the activation function with the non-activated output as input
-	            
-	            double prevLayerGradientSum = 0;
+    public void backPropagation(Matrix expectedOutput) {
+        for (int i = this.architecture.length - 1; i > 0; --i) {
+            for (int j = 0; j < architecture[i]; ++j) {                    
+                double curNoutput = this.outputs[i].getElements()[0][j];
+                double dActivationOnOutput = AFDerivative(curNoutput, this.outputLayerAF); // derivative of the activation function with the non-activated output as input
+                
+                double prevLayerGradientSum = 0;
 
-	            if (i == this.architecture.length - 1) { // Output layer
-	                prevLayerGradientSum = lossDerivative(this.activations[i].getElements()[j][0], expectedOutput.getElements()[j][0]); // derivative of the loss function
-	            } else { // Hidden layers
-	                for (int k = 0; k < inputGradients[i + 1].getRows(); ++k) {
-	                    prevLayerGradientSum += inputGradients[i + 1].getElements()[j][k]; // considering the sum of the next layer input of the neuron considered
-	                }
-	            }
+                if (i == this.architecture.length - 1) { // Output layer
+                    prevLayerGradientSum = lossDerivative(this.activations[i].getElements()[0][j], expectedOutput.getElements()[0][j]); // derivative of the loss function
+                } else { // Hidden layers
+                    for (int k = 0; k < architecture[i+1]; ++k) {
+                        prevLayerGradientSum += inputGradients[i + 1].getElements()[j][k]; // considering the sum of the next layer input of the neuron considered
+                    }
+                }
+                double delta = prevLayerGradientSum * dActivationOnOutput; // applying chain rule on the partial derivatives calculated up to now. Delta is the same for every weight of a given neuron.
 
-	            double delta = prevLayerGradientSum * dActivationOnOutput; // applying chain rule on the partial derivatives calculated up to now. Delta is the same for every weight of a given neuron.
+                for (int k = 0; k < architecture[i - 1]; ++k) {
+                    double weightGradient = delta * this.activations[i - 1].getElements()[0][k]; // calculating the gradient using the derivative of l(S(Z))
+                    this.weightsGradients[i].getElements()[k][j] += weightGradient; // setting the weightGradient of the current neuron (swapped indexing)
+                    
+                    inputGradients[i].getElements()[k][j] = delta * weights[i].getElements()[k][j]; // storing the gradient of the input (swapped indexing)
+                }
 
-	            for (int k = 0; k < architecture[i - 1]; ++k) {                        
-	                double weightGradient = delta * this.activations[i - 1].getElements()[k][0]; // calculating the gradient using the derivative of l(S(Z))
-	                this.weightsGradients[i].getElements()[j][k] += weightGradient; // setting the weightGradient of the current neuron
-	                
-	                inputGradients[i].getElements()[j][k] = delta * weights[i].getElements()[j][k]; // storing the gradient of the input
-	            }
+                // delta = biasGradient
+                this.biasesGradients[i].getElements()[0][j] += delta; // Updated indexing (biases are now stored as (1 × Output Neurons))
+            }
+        }
+    }
 
-	            // delta = biasGradient
-	            this.biasesGradients[i].getElements()[j][0] += delta;
-	        }
-	    }
-	}
 	
 	
 	
@@ -238,18 +244,21 @@ public class NeuralNetwork implements Serializable{
 	 */
 	private void updateWeightsAndBiases(int trainCount) {
 	    for (int i = 1; i < this.architecture.length; ++i) {
-	    	for (int j = 0; j < this.architecture[i]; ++j) {
-	            for (int k = 0; k < this.weights[i].getElements()[j].length; ++k) {
-	            	this.weightsGradients[i].getElements()[j][k]/=trainCount;
-	            	this.weights[i].getElements()[j][k]-=this.weightsGradients[i].getElements()[j][k]*learningRate;
-	            	this.weightsGradients[i].getElements()[j][k]=0d;
+	        for (int k = 0; k < this.architecture[i - 1]; ++k) { // Iterate over input neurons
+	            for (int j = 0; j < this.architecture[i]; ++j) { // Iterate over output neurons
+	                this.weightsGradients[i].getElements()[k][j] /= trainCount;
+	                this.weights[i].getElements()[k][j] -= this.weightsGradients[i].getElements()[k][j] * learningRate;
+	                this.weightsGradients[i].getElements()[k][j] = 0d;
 	            }
-            	this.biasesGradients[i].getElements()[j][0]/=trainCount;
-            	this.biases[i].getElements()[j][0]-=this.biasesGradients[i].getElements()[j][0]*learningRate;
-            	this.biasesGradients[i].getElements()[j][0]=0d;
+	        }
+	        for (int j = 0; j < this.architecture[i]; ++j) {
+	            this.biasesGradients[i].getElements()[0][j] /= trainCount;
+	            this.biases[i].getElements()[0][j] -= this.biasesGradients[i].getElements()[0][j] * learningRate;
+	            this.biasesGradients[i].getElements()[0][j] = 0d;
 	        }
 	    }
 	}
+
 	
 	
     
@@ -276,10 +285,41 @@ public class NeuralNetwork implements Serializable{
 	 */
 	public double lossDerivative(double output, double expectedOutput) {
 		double error=0d;
-			error = 2*(output - expectedOutput);
+			error = output - expectedOutput;
         return error;
 	}
 
+	/**
+	 * Computes average loss (MSE) over a dataset.
+	 * @param trainingData Matrix where each row is a training example, 
+	 *                     with inputs followed by expected outputs.
+	 * @param nOutputs Number of output columns in trainingData.
+	 * @return Average loss across all examples.
+	 */
+	public double computeAverageLoss(Matrix trainingData, int nOutputs) {
+	    int numSamples = trainingData.getRows();
+	    double totalLoss = 0.0;
+	    
+	    for (int i = 0; i < numSamples; i++) {
+	        // Split input and expected output
+	        Matrix input = trainingData.getSubMatrix(i, 0, 1, trainingData.getCols() - nOutputs);
+	        Matrix expected = trainingData.getSubMatrix(i, trainingData.getCols() - nOutputs, 1, nOutputs);
+	        
+	        // Forward pass
+	        forward(input);
+	        Matrix prediction = activations[layerCount - 1];
+	        
+	        // Calculate loss for this example
+	        for (int j = 0; j < nOutputs; j++) {
+	            double error = prediction.getElements()[0][j] - expected.getElements()[0][j];
+	            totalLoss += error * error;
+	        }
+	    }
+	    
+	    // Average loss: total / (number of samples * number of outputs)
+	    return totalLoss / (numSamples * nOutputs);
+	}
+	
 	
 	/**
 	 * 
@@ -442,8 +482,9 @@ public class NeuralNetwork implements Serializable{
         Matrix activated = new Matrix(matrix.rows, matrix.cols);
         for (int i = 0; i < matrix.rows; i++) {
             for (int j = 0; j < matrix.cols; j++) {
-            	if(iLayer+1==layerCount-1) {
+            	if(iLayer==layerCount-1) {
                     activated.elements[i][j] = activationFunction(matrix.elements[i][j], this.outputLayerAF);
+
                 }else {
                 	activated.elements[i][j] = activationFunction(matrix.elements[i][j], this.hiddenLayersAF);
                 }
@@ -455,11 +496,19 @@ public class NeuralNetwork implements Serializable{
     private double sigmoid(double x) {
         return 1.0 / (1.0 + Math.exp(-x));
     }
-    
+    private double relu(double x) {
+        return Math.max(0, x);
+    }
+
+    private double reluDerivative(double x) {
+        return x > 0 ? 1 : 0;
+    }
 	private double activationFunction(double x, String af){
 		switch(af) {
 			case "sig":
 				return sigmoid(x);
+			case "rel":
+				return relu(x);
 			default:
 				break;
 		}
@@ -473,11 +522,13 @@ public class NeuralNetwork implements Serializable{
 		case "sig":
 			double sig = sigmoid(x);
 	        return sig * (1.0 - sig);
+		case "rel":
+			return reluDerivative(x);
 		default:
 			break;
 		}
 		
-		return x;
+		return 1;
     }
 	
 	

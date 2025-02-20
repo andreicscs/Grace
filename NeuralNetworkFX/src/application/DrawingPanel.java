@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+
 import javafx.application.Platform;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -33,9 +35,17 @@ public class DrawingPanel extends StackPane{
 	            	int[] architecture= {2,4,2,1};
 	            	
 	            	NeuralNetwork scervelo = new NeuralNetwork(architecture);
-	            	scervelo.debugMatrixDimensions();
+	            	//scervelo.debugMatrixDimensions();
 	            	
-	            	Matrix trainingData = new Matrix(3,3);
+	            	// Generate 1000 points
+	            	Matrix dataset = new Matrix(1000, 3); // Columns: x, y, label
+	            	Random rand = new Random();
+	            	for (int i = 0; i < 1000; i++) {
+	            	    double x = rand.nextDouble() * 2 - 1; // x in [-1, 1]
+	            	    double y = rand.nextDouble() * 2 - 1; // y in [-1, 1]
+	            	    double label = (x * x + y * y <= 0.7 * 0.7) ? 1 : 0; // Inside circle?
+	            	    dataset.setElements(i, 0, new double[]{x, y, label});
+	            	}
 	            	
 	            	
 	            	File nnData = new File("savedNN.dat");
@@ -45,13 +55,13 @@ public class DrawingPanel extends StackPane{
 	        			double endTime;
 	        			double elapsedTime;
 	        			
-	        			for(int i=0; i<3000; ++i) {
-		        			scervelo.train(trainingData, 1, 1);
+	        			for(int i=0; i<10000; ++i) {
+		        			scervelo.train(dataset, 1, 1);
 		        			// DEBUG
 		        			if(i%100==0) {
 		        				endTime = System.currentTimeMillis();
 		        				elapsedTime = endTime - startTime;
-		        				System.out.println("Iteration " + i + /*", Cost: " + scervelo.lossAverage(TrainIn, TrainOut) + */",time: " + elapsedTime);
+		        				System.out.println("Iteration " + i + ", Cost: " + scervelo.computeAverageLoss(dataset, 1) + ",time: " + elapsedTime);
 		        				startTime = endTime;
 		        			}
 	        				
@@ -59,6 +69,7 @@ public class DrawingPanel extends StackPane{
 	        		}else if(nnData.exists()) {
 	        			scervelo = NeuralNetwork.loadState();
 	        		}
+	        		
 	            }
            });
 	}

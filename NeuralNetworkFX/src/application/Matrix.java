@@ -34,7 +34,24 @@ public class Matrix {
     public void setElements(double[][] elements) {
         this.elements = elements;
     }
-
+    
+    /**
+     * Sets the elements of the matrix at the specified row and column.
+     * 
+     * @param row The row index (0-based).
+     * @param col The column index (0-based).
+     * @param values The values to set (as a 1D array).
+     */
+    public void setElements(int row, int col, double[] values) {
+        for (int i = 0; i < values.length; i++) {
+            if (col + i < this.cols) { // Ensure column index is within bounds
+                this.elements[row][col + i] = values[i];
+            } else {
+                throw new IllegalArgumentException("Column index out of bounds.");
+            }
+        }
+    }
+    
     public static Matrix multiply(Matrix a, Matrix b) {
         if (a.cols != b.rows) throw new IllegalArgumentException("Matrix dimensions do not match for multiplication.");
         Matrix result = new Matrix(a.rows, b.cols);
