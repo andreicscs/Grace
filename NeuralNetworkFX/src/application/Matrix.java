@@ -102,6 +102,15 @@ public class Matrix {
         
         return transposed;
     }
+    public void printMatrix() {
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                System.out.printf("%8.3f ", elements[i][j]); // Format to 3 decimal places
+            }
+            System.out.println(); // New line after each row
+        }
+        System.out.println(); // Extra line for better readability
+    }
 
     
 }

@@ -2,16 +2,10 @@ package application;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
-import javafx.application.Platform;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.StackPane;
-import javafx.scene.paint.Color;
-import com.csvreader.CsvReader;
+
 
 public class DrawingPanel extends StackPane{
     private static Canvas canvas;
@@ -32,20 +26,23 @@ public class DrawingPanel extends StackPane{
 	            @Override
 				public void run() {
 	            	
-	            	int[] architecture= {2,4,2,1};
+	            	int[] architecture= {2,4,1};
 	            	
 	            	NeuralNetwork scervelo = new NeuralNetwork(architecture);
 	            	//scervelo.debugMatrixDimensions();
 	            	
-	            	// Generate 1000 points
-	            	Matrix dataset = new Matrix(1000, 3); // Columns: x, y, label
-	            	Random rand = new Random();
-	            	for (int i = 0; i < 1000; i++) {
-	            	    double x = rand.nextDouble() * 2 - 1; // x in [-1, 1]
-	            	    double y = rand.nextDouble() * 2 - 1; // y in [-1, 1]
-	            	    double label = (x * x + y * y <= 0.7 * 0.7) ? 1 : 0; // Inside circle?
-	            	    dataset.setElements(i, 0, new double[]{x, y, label});
-	            	}
+	            	Matrix dataset = new Matrix(4, 3);
+	                dataset.setElements(new double[][] {
+	                	{0,0,0},
+	                	{0,1,1},
+	                	{1,0,1},
+	                	{1,1,0}
+	                });
+	            	
+	            	scervelo.setLearning_rate(0.1);
+	            	scervelo.setHiddenLayersAF("relu");
+	            	scervelo.setOutputLayerAF("sigmoid");
+	            	int nOutputs=1;
 	            	
 	            	
 	            	File nnData = new File("savedNN.dat");
@@ -55,16 +52,17 @@ public class DrawingPanel extends StackPane{
 	        			double endTime;
 	        			double elapsedTime;
 	        			
-	        			for(int i=0; i<10000; ++i) {
-		        			scervelo.train(dataset, 1, 1);
+	        			for(int i=0; i<10000000; ++i) {
+		        			scervelo.train(dataset, nOutputs, 64);
 		        			// DEBUG
-		        			if(i%100==0) {
+		        			if (i % 1000 == 0) {
 		        				endTime = System.currentTimeMillis();
 		        				elapsedTime = endTime - startTime;
-		        				System.out.println("Iteration " + i + ", Cost: " + scervelo.computeAverageLoss(dataset, 1) + ",time: " + elapsedTime);
 		        				startTime = endTime;
+		        		        double loss = scervelo.computeAverageLoss(dataset, nOutputs);
+		        		        double accuracy = scervelo.computeAccuracy(dataset, nOutputs);
+		        		        System.out.println("Iteration " + i + ",\t Cost: " + loss + ",\t Accuracy: " + accuracy +"%" + ",\t time (ms): " + elapsedTime);
 		        			}
-	        				
 		        		}
 	        		}else if(nnData.exists()) {
 	        			scervelo = NeuralNetwork.loadState();
@@ -73,7 +71,7 @@ public class DrawingPanel extends StackPane{
 	            }
            });
 	}
-	 
+	
 	public void start(boolean toTrain) {
 		this.toTrain = toTrain;
 		thread1.start();

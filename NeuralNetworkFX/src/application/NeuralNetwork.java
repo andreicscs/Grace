@@ -9,51 +9,52 @@
 
 
 /*
-		WHAT TO CHANGE:
+		UPDATED STRUCTURE:
+
 	Weights:
-		The weights will be stored in an array of matrices:
-		L_i = layers
-		N_i = neurons
-		W_i = weights
+		The weights are now stored in an array of matrices:
+		- L_i = layers
+		- N_i = neurons
+		- W_i = weights
 		
 	Biases:
-		The biases will be stored in an array of arrays
+		The biases are now stored in an array of arrays.
 		
 	Activations:
-		Activations (activated neurons outputs) will be stored in an array of arrays.
+		Activated neuron outputs (activations) are now stored in an array of arrays.
 		
 	Outputs:
-		Outputs(pre-activated neurons outputs, plain output or Z) will be stored in an array of arrays. 
-		//used to apply the chain rule
+		Pre-activated neuron outputs (plain output or Z) are now stored in an array of arrays. 
+		// Used for applying the chain rule
 		
 	Architecture:
-		The architecture will be declared by a vector, each column will represent a layer and its value will represent how many neurons that layer has.
-		Ex:
+		The architecture is now defined by a vector, where each element represents a layer and its value indicates the number of neurons in that layer.
+		Example:
 			Int[] arch = {2,10,10,5,1};
-			Represents the following architecture:
-			2 neurons in the input layer, 10 neurons in the first hidden layer… 1 neuron in the output layer, for a total of 5 layers (arch.size).
+			This represents the following architecture:
+			- 2 neurons in the input layer
+			- 10 neurons in the first hidden layer
+			- ...
+			- 1 neuron in the output layer
+			For a total of 5 layers (arch.size).
 	
-	Arrays of arrays/matrices are used instead of directly using matrices or 3d matrices because 
-	each layer can have different sizes, and the neuron's weights too. 
-	So by using an array of matrices each layer can have a Dynamically allocated matrix 
-	based on the architecture of the NN.
+	Arrays of arrays/matrices are used instead of directly using matrices or 3D matrices 
+	to accommodate layers and neuron weights of different sizes dynamically. 
+	This allows each layer to have a dynamically allocated matrix based on the neural network's architecture.
 	
-	By organizing weights and biases into arrays and matrices, it becomes easier to implement parallel computations. 
-	Libraries like OpenMP for multithreading or CUDA for GPU acceleration can efficiently handle these operations on matrices.
-	
+	Organizing weights and biases into arrays and matrices facilitates implementation for parallel computations. 
+	Libraries like OpenMP (for multithreading) or CUDA (for GPU acceleration) can efficiently handle these matrix operations.
 	
 	Matrices:
-		N (first value) = columns
-		M (second value) = rows
+		- N (first value) = columns
+		- M (second value) = rows
 		
-		first value of array of matrices initialized to n=1 m=architecture[0], 1 input means 1 weight, 1 bias... and there each row rapresents a neuron.
-		other values initialized to architecture[i-1] architecture[i]
+		The first matrix in the array is initialized with n = 1 and m = architecture[0], 
+		as one input corresponds to one weight and one bias. Each row represents a neuron.
+		Other matrices are initialized with dimensions architecture[i-1] × architecture[i].
 */
 
 
-
-
-// TO DO!!! not finished
 
 package application;
 import java.io.FileInputStream;
@@ -81,12 +82,10 @@ public class NeuralNetwork implements Serializable{
     int layerCount;
     String hiddenLayersAF;
     String outputLayerAF;
-	
-	private double learningRate;
-	//private double momentumFactor; // Represents how much of the momentum is retained ( to be implemented)
-
-	
-	// !TO DO check if initialization is correct
+    String lossFunction;
+    private double learningRate;
+    int numOutputs;
+    
 	public NeuralNetwork(int[] architecture) {
 		super();
 		this.architecture = architecture;
@@ -98,6 +97,7 @@ public class NeuralNetwork implements Serializable{
 		this.inputGradients = new Matrix[layerCount];
 		this.activations = new Matrix[layerCount];
 		this.outputs = new Matrix[layerCount];
+		this.numOutputs = architecture[architecture.length-1];
 		
 		weights[0] = new Matrix(1, architecture[0]);
 	    biases[0] = new Matrix(1, architecture[0]);
@@ -133,114 +133,101 @@ public class NeuralNetwork implements Serializable{
 		    initializeMatrix(outputs[i], 0);
 		    initializeMatrix(activations[i], 0);
 		}
-		this.learningRate=0.01d;
+		this.learningRate=0.5d;
 		
-		// default to relu for hiudden layers and none for output layer can be changed using set...().
-		this.hiddenLayersAF="rel";
+		this.hiddenLayersAF="";
 		this.outputLayerAF="";
+		this.lossFunction="";
 	}
-
-	
-	public void debugMatrixDimensions() {
-	    for (int i = 0; i < layerCount; i++) {
-	        System.out.println("Layer " + i);
-	        System.out.println("Weights: " + weights[i].rows + " rows x " + weights[i].cols + " cols");
-	        System.out.println("Biases: " + biases[i].rows + " rows x " + biases[i].cols + " cols");
-	        System.out.println("Weights Gradients: " + weightsGradients[i].rows + " rows x " + weightsGradients[i].cols + " cols");
-	        System.out.println("Biases Gradients: " + biasesGradients[i].rows + " rows x " + biasesGradients[i].cols + " cols");
-	        System.out.println("Outputs: " + outputs[i].rows + " rows x " + outputs[i].cols + " cols");
-	        System.out.println("Activations: " + activations[i].rows + " rows x " + activations[i].cols + " cols");
-	        System.out.println();
-	    }
-	}
-
 	
 	
 	/**
 	 * This function trains the neural network
 	 * 
-	 * @param trainingData all columns dedicated to input apart from the last nOutputs columns which will be used to store the expected output.
-	 * @param nOutputs number of the coluns used for the expected outputs
+	 * @param trainingData: all columns dedicated to input apart from the last *nOutputs columns which will be used to store the expected output.
+	 * @param nOutputs number of the coluns used for the expected outputs.
+	 * @param batchSize the size of the single batches the training data will be split in, after which the weights and biases update. 1 for Stochastic gradient descent, 1<batchSize<trainingDataSize for mini batches, trainingDataSize for full batch 
+	 * 
 	 */
 	public void train(Matrix trainingData, int nOutputs, int batchSize) {
-		int trainCount=trainingData.getCols();
+		int trainCount=trainingData.getRows();
 		
 		// Loop over training examples
 	    for (int i = 0; i < trainCount; ++i) {
 	        // Forward pass
-	        forward(trainingData.getSubMatrix(i, 0, 1, trainCount-nOutputs));
+        	//System.out.println(i+" input[i] rows: " + trainingData.getSubMatrix(i, 0, 1, trainingData.getCols()-nOutputs).getRows() + " input[i] cols: " + trainingData.getSubMatrix(i, 0, 1, trainingData.getCols()-nOutputs).getCols());
+	        forward(trainingData.getSubMatrix(i, 0, 1, trainingData.getCols()-nOutputs));
 	        // Backwards pass
-	        backPropagation(trainingData.getSubMatrix(i, trainCount-nOutputs, 1, nOutputs));
-	        if ((i + 1) % batchSize == 0 || i == trainCount - 1) {  // Controlla se è multiplo di n
+	        backPropagation(trainingData.getSubMatrix(i, trainingData.getCols()-nOutputs, 1, nOutputs));
+	        if ((i + 1) % batchSize == 0 || i == trainingData.getCols() - 1) {  // Controlla se è multiplo di n
 	    	    updateWeightsAndBiases(batchSize);
 
 	        }
 	    }
 	}
 	
-	
-	// TO DO non funge, controllare operazioni tra matrici.
-	// Forward propagation method
+	/**
+	 * Forward propagation method, this function forwards the input through the neural network
+	 * 
+	 * @param input: 1d matrix of the input
+	 * 
+	 */
     public void forward(Matrix input) {
     	activations[0] = input;
     	outputs[0] = activations[0];
-
-        for (int i = 1; i < layerCount; i++) {
-        	//System.out.println(i-1 + " Activations: " + activations[i-1].rows + " rows x " + activations[i-1].cols + " cols");
-        	//System.out.println(i + " Weights: " + Matrix.transpose(weights[i]).rows + " rows x " + Matrix.transpose(weights[i]).cols + " cols");
-
+        for (int i = 1; i < layerCount; ++i) {
         	activations[i] = Matrix.multiply(activations[i-1], weights[i]);
-        	//System.out.println(i + " Activations: " + activations[i].rows + " rows x " + activations[i].cols + " cols");
-
         	activations[i].add(biases[i]);
             outputs[i]=activations[i];
             activations[i] = applyActivation(activations[i], i);
         }
-        
     }
 	
 	/**
 	 * This function is used to propagate the error of the output layer to all the hidden layers
 	 * 
 	 * @param expectedOutput the output that we expect from the neural network
+	 * 
 	 */
     public void backPropagation(Matrix expectedOutput) {
         for (int i = this.architecture.length - 1; i > 0; --i) {
-            for (int j = 0; j < architecture[i]; ++j) {                    
+        	for (int j = 0; j < architecture[i]; ++j) {                    
                 double curNoutput = this.outputs[i].getElements()[0][j];
-                double dActivationOnOutput = AFDerivative(curNoutput, this.outputLayerAF); // derivative of the activation function with the non-activated output as input
-                
-                double prevLayerGradientSum = 0;
-
+            	double curNactivatedOutput = this.activations[i].getElements()[0][j];
+                double dActivationOnOutput=0;
+                double delta;
                 if (i == this.architecture.length - 1) { // Output layer
-                    prevLayerGradientSum = lossDerivative(this.activations[i].getElements()[0][j], expectedOutput.getElements()[0][j]); // derivative of the loss function
+                	if (numOutputs > 1) { // Multi-output
+                		delta = multipleOutputLossDerivative(curNactivatedOutput, expectedOutput.getElements()[0][j]); // because the af derivative and the loss derivative simplify each other only one calculation is needed
+                    }else { // Single output
+                		double dLoss_dY = lossDerivative(curNactivatedOutput, expectedOutput.getElements()[0][j]); // derivative of the loss function
+                		delta = dLoss_dY * AFDerivative(curNoutput, this.outputLayerAF);// delta = dLoss_dY * derivative of the activation function with the non-activated output as input
+                	}
                 } else { // Hidden layers
-                    for (int k = 0; k < architecture[i+1]; ++k) {
+                	dActivationOnOutput = AFDerivative(curNoutput, this.hiddenLayersAF); // derivative of the activation function with the non-activated output as input
+                	double prevLayerGradientSum = 0;
+                	for (int k = 0; k < architecture[i+1]; ++k) {
                         prevLayerGradientSum += inputGradients[i + 1].getElements()[j][k]; // considering the sum of the next layer input of the neuron considered
                     }
+                	delta = prevLayerGradientSum * dActivationOnOutput; // applying chain rule on the partial derivatives calculated up to now. Delta is the same for every weight of a given neuron.
                 }
-                double delta = prevLayerGradientSum * dActivationOnOutput; // applying chain rule on the partial derivatives calculated up to now. Delta is the same for every weight of a given neuron.
-
+                // update gradients.
                 for (int k = 0; k < architecture[i - 1]; ++k) {
                     double weightGradient = delta * this.activations[i - 1].getElements()[0][k]; // calculating the gradient using the derivative of l(S(Z))
                     this.weightsGradients[i].getElements()[k][j] += weightGradient; // setting the weightGradient of the current neuron (swapped indexing)
                     
                     inputGradients[i].getElements()[k][j] = delta * weights[i].getElements()[k][j]; // storing the gradient of the input (swapped indexing)
                 }
-
-                // delta = biasGradient
+                // biasGradient = delta
                 this.biasesGradients[i].getElements()[0][j] += delta; // Updated indexing (biases are now stored as (1 × Output Neurons))
             }
         }
     }
 
-	
-	
-	
 	/**
-	 * This function is used to update weight and biases using each gradient calculated with the chain rule
+	 * This function is used to update weight and biases using gradients calculated during back propagation process.
 	 * 
-	 * @param trainCount the number of the train iterations
+	 * @param trainCount the number of the training iterations
 	 */
 	private void updateWeightsAndBiases(int trainCount) {
 	    for (int i = 1; i < this.architecture.length; ++i) {
@@ -249,7 +236,7 @@ public class NeuralNetwork implements Serializable{
 	                this.weightsGradients[i].getElements()[k][j] /= trainCount;
 	                this.weights[i].getElements()[k][j] -= this.weightsGradients[i].getElements()[k][j] * learningRate;
 	                this.weightsGradients[i].getElements()[k][j] = 0d;
-	            }
+	            } 
 	        }
 	        for (int j = 0; j < this.architecture[i]; ++j) {
 	            this.biasesGradients[i].getElements()[0][j] /= trainCount;
@@ -261,38 +248,253 @@ public class NeuralNetwork implements Serializable{
 
 	
 	
-    
-    
+	
 	/**
-	 * This function calculate the value of the loss
+	 * This function calculate the value of the loss for multiple outputs architectures
+	 * 
+	 * @param outputs the output of the nn
+	 * @param expectedOutputs the output that we expect from the nn
+	 * @return loss the loss value
+	 */
+	public double multipleOutputLoss(Matrix output, Matrix expectedOutput) {
+		switch(this.lossFunction) {
+		case "CCE":
+			return CCEloss(output,expectedOutput);
+		default:
+            throw new IllegalArgumentException("Unsupported loss function: " + this.lossFunction);
+		}
+	}
+	
+	/**
+	 * This function calculate the value of the derivative of the loss function for multiple outputs architectures
+	 * 
+	 * @param output the output of the nn
+	 * @param expectedOutput the output that we expect from the nn
+	 * @return loss the loss value
+	 */
+	public double multipleOutputLossDerivative(double output, double expectedOutput) {
+		switch(this.lossFunction) {
+		case "CCE":
+			return CCElossDerivative(output,expectedOutput);
+		default:
+            throw new IllegalArgumentException("Unsupported loss function: " + this.lossFunction);
+		}
+	}
+	
+	/**
+	 * This function calculate the value of the loss for single output architectures
+	 * defaults to MSE loss function.
 	 * 
 	 * @param output the output of the nn
 	 * @param expectedOutput the output that we expect from the nn
 	 * @return loss the loss value
 	 */
 	public double loss(double output, double expectedOutput) {
-		double error=0d;
-			error = (output - expectedOutput);
-			error = Math.pow(error, 2);
-        return error;
+		switch(this.lossFunction) {
+		case "MSE":
+			return MSEloss(output,expectedOutput);
+		case "BCE":
+			return BCEloss(output,expectedOutput);
+		default:
+			break;
+		}
+		return MSEloss(output,expectedOutput);
 	}
 	
 	/**
-	 * This function calculate the derivative of the loss function in the point x(weight)
+	 * This function calculate the value of the derivative of the loss function for single output architectures
 	 * 
-	 * @param x the point in x in the function loss
-	 * @return the derivative of the loss(x)
+	 * @param output the output of the nn
+	 * @param expectedOutput the output that we expect from the nn
+	 * @return loss the loss value
 	 */
 	public double lossDerivative(double output, double expectedOutput) {
+		switch(this.lossFunction) {
+		case "MSE":
+			return MSElossDerivative(output,expectedOutput);
+		case "BCE":
+			return BCElossDerivative(output,expectedOutput);
+		default:
+			break;
+		}
+		return MSElossDerivative(output,expectedOutput);
+	}
+	
+	
+	/**
+	 * This function applies the corresponding AFs to each layer.
+	 * 
+	 * @param matrix the output of a given layer to be activated
+	 * @param iLayer the index of said layer
+	 * @return activated[] the activated values
+	 */
+    private Matrix applyActivation(Matrix matrix, int iLayer) {
+        Matrix activated = new Matrix(matrix.rows, matrix.cols);
+        
+        if((iLayer==layerCount-1) && (numOutputs>1)) { // try to apply non mutually exclusive multiple clases AFs first.
+        	activated = multipleOutputActivationFunction(matrix);
+        	if(activated!=null) {
+        		return activated;
+        	}
+        }
+        activated = new Matrix(matrix.rows, matrix.cols);
+        // if they were not selected proceed with mutually exclusive AF.
+        for (int i = 0; i < matrix.rows; i++) {
+            for (int j = 0; j < matrix.cols; j++) {
+            	if(iLayer==layerCount-1) {
+            		activated.elements[i][j] = activationFunction(matrix.elements[i][j], this.outputLayerAF);
+                }else {
+                	activated.elements[i][j] = activationFunction(matrix.elements[i][j], this.hiddenLayersAF);
+                }
+            }
+        }
+        return activated;
+    }
+    
+    private Matrix multipleOutputActivationFunction(Matrix input){
+    	switch(this.outputLayerAF) {
+		case "softmax":
+			return softmax(input);
+		default:
+			break;
+    	}
+    	return null;
+    }
+    
+    private Matrix MAFDerivative(Matrix input){
+    	switch(this.outputLayerAF) {
+		case "softmax":
+			break;
+		default:
+			break;
+    	}
+    	return null;
+    }
+    
+	private double activationFunction(double x, String af){
+		switch(af) {
+			case "sigmoid":
+				return sigmoid(x);
+			case "relu":
+				return relu(x);
+			default:
+				break;
+		}
+		
+		return x;
+	}
+    
+    private double AFDerivative(double x, String af) {
+    	
+    	switch(af) {
+		case "sigmoid":
+			double sig = sigmoid(x);
+	        return sig * (1.0 - sig);
+		case "relu":
+			return reluDerivative(x);
+		default:
+			break;
+		}
+		
+		return 1;
+    }
+    
+    private double sigmoid(double x) {
+        return 1.0 / (1.0 + Math.exp(-x));
+    }
+    private double relu(double x) {
+        return Math.max(0, x);
+    }
+
+    private double reluDerivative(double x) {
+        return x > 0 ? 1 : 0;
+    }
+    
+    private Matrix softmax(Matrix matrix) {
+        Matrix result = new Matrix(matrix.rows, matrix.cols);
+        for (int i = 0; i < matrix.rows; i++) {
+            double max = matrix.getElements()[i][0];
+            for (int j = 1; j < matrix.cols; j++) {
+                if (matrix.getElements()[i][j] > max) {
+                    max = matrix.getElements()[i][j];
+                }
+            }
+            double sum = 0.0;
+            for (int j = 0; j < matrix.cols; j++) {
+                result.getElements()[i][j] = Math.exp(matrix.getElements()[i][j] - max);
+                sum += result.getElements()[i][j];
+            }
+            for (int j = 0; j < matrix.cols; j++) {
+                result.getElements()[i][j] /= sum;
+            }
+        }
+        return result;
+    }
+    
+	
+	
+	public double CCEloss(Matrix predictions, Matrix labels) {
+	    if (predictions.rows != labels.rows || predictions.cols != labels.cols) {
+	        throw new IllegalArgumentException("Predictions and labels must have the same dimensions.");
+	    }
+
+	    double loss = 0.0;
+	    for (int i = 0; i < predictions.rows; i++) {
+	        for (int j = 0; j < predictions.cols; j++) {
+	            double predicted = predictions.getElements()[i][j];
+	            double expected = labels.getElements()[i][j];
+
+	            // Ensure predicted values are valid probabilities
+	            if (predicted <= 0 || predicted > 1) {
+	                throw new IllegalArgumentException("Predictions must be probabilities (0 < p <= 1).");
+	            }
+
+	            // CCE formula: -sum(y * log(p))
+	            loss += expected * Math.log(predicted + 1e-10); // Add epsilon to avoid log(0)
+	        }
+	    }
+
+	    // Average the loss over all samples
+	    return -loss / predictions.rows;
+	}
+	
+	public double CCElossDerivative(double predicted, double expected) {
+	    return predicted-expected;
+	}
+	
+    
+	public double BCEloss(double output, double expectedOutput) {
+		// Clip output to avoid log(0)
+	    double epsilon = 1e-9;  // Small value to prevent log(0)
+	    output = Math.max(epsilon, Math.min(1 - epsilon, output));
+
+	    return - (expectedOutput * Math.log(output) + (1 - expectedOutput) * Math.log(1 - output));
+	}
+	public double BCElossDerivative(double output, double expectedOutput) { 
+		// Clip output to avoid division by zero
+	    double epsilon = 1e-9;
+	    output = Math.max(epsilon, Math.min(1 - epsilon, output));
+
+	    return (output - expectedOutput) / (output * (1 - output));
+	}
+
+	public double MSEloss(double output, double expectedOutput) {
+		double error=0d;
+			error = (output - expectedOutput);
+			error = error*error;
+        return error;
+	}
+
+	public double MSElossDerivative(double output, double expectedOutput) {
 		double error=0d;
 			error = output - expectedOutput;
         return error;
 	}
-
+    
+    
 	/**
 	 * Computes average loss (MSE) over a dataset.
-	 * @param trainingData Matrix where each row is a training example, 
-	 *                     with inputs followed by expected outputs.
+	 * @param trainingData Matrix where each row is a training example, with inputs followed by expected outputs.
 	 * @param nOutputs Number of output columns in trainingData.
 	 * @return Average loss across all examples.
 	 */
@@ -309,16 +511,103 @@ public class NeuralNetwork implements Serializable{
 	        forward(input);
 	        Matrix prediction = activations[layerCount - 1];
 	        
-	        // Calculate loss for this example
-	        for (int j = 0; j < nOutputs; j++) {
-	            double error = prediction.getElements()[0][j] - expected.getElements()[0][j];
-	            totalLoss += error * error;
+	        if(nOutputs>1) {
+	        	totalLoss+=multipleOutputLoss(prediction, expected);
+	        }else {
+	        	// Calculate loss for this example
+		        for (int j = 0; j < nOutputs; j++) {
+		            totalLoss+=loss(prediction.getElements()[0][j], expected.getElements()[0][j]);
+		        }
+	        }    
+	    }
+	    return totalLoss / numSamples;
+	}
+	
+	
+	public double computeAccuracy(Matrix dataset, int nOutputs) {
+		if(nOutputs>1) {
+			return computeMultiClassAccuracy(dataset, nOutputs);
+		}else {
+			return computeSingleOutputAccuracy(dataset);
+		}
+	}
+	
+	public double computeMultiClassAccuracy(Matrix dataset, int nOutputs) {
+	    int correct = 0;
+	    for(int i=0; i<dataset.rows; i++) {
+	        Matrix input = dataset.getSubMatrix(i, 0, 1, dataset.cols - nOutputs);
+	        Matrix output = dataset.getSubMatrix(i, dataset.cols - nOutputs, 1, nOutputs);
+	        
+	        forward(input);
+	        Matrix pred = activations[layerCount-1];
+	        
+	        int predClass = 0;
+	        double maxVal = pred.getElements()[0][0];
+	        for(int j=1; j<nOutputs; j++) {
+	            if(pred.getElements()[0][j] > maxVal) {
+	                maxVal = pred.getElements()[0][j];
+	                predClass = j;
+	            }
+	        }
+	        
+	        int trueClass = 0;
+	        for(int j=0; j<nOutputs; j++) {
+	            if(output.getElements()[0][j] == 1.0) {
+	                trueClass = j;
+	                break;
+	            }
+	        }
+	        
+	        if(predClass == trueClass) correct++;
+	    }
+	    return (double)correct/dataset.rows*100;
+	}
+	
+	public double computeSingleOutputAccuracy(Matrix dataset) {
+	    int numSamples = dataset.getRows();
+	    int correct = 0;
+	    for (int i = 0; i < numSamples; i++) {
+	        Matrix input = dataset.getSubMatrix(i, 0, 1, dataset.getCols() - 1);
+	        Matrix expected = dataset.getSubMatrix(i, dataset.getCols() - 1, 1, 1);
+	        forward(input);
+	        double prediction = this.activations[layerCount - 1].getElements()[0][0];
+	        int predictedLabel = (prediction >= 0.5) ? 1 : 0;
+	        int trueLabel = (int) expected.getElements()[0][0];
+	        if (predictedLabel == trueLabel) {
+	            correct++;
 	        }
 	    }
-	    
-	    // Average loss: total / (number of samples * number of outputs)
-	    return totalLoss / (numSamples * nOutputs);
+	    return (double) correct / numSamples * 100; // Accuracy in percentage
 	}
+	
+	private void initializeMatrixRand(Matrix matrix, Random rand) {
+        for (int i = 0; i < matrix.rows; i++) {
+            for (int j = 0; j < matrix.cols; j++) {
+                matrix.elements[i][j] = rand.nextGaussian(); // Random values from a normal distribution
+            }
+        }
+    }
+	private void initializeMatrix(Matrix matrix, double d) {
+        for (int i = 0; i < matrix.rows; i++) {
+            for (int j = 0; j < matrix.cols; j++) {
+                matrix.elements[i][j] = d; // Random values from a normal distribution
+            }
+        }
+    }
+	
+	public void debugMatrixDimensions() {
+	    for (int i = 0; i < layerCount; i++) {
+	        System.out.println("Layer " + i);
+	        System.out.println("Weights: " + weights[i].rows + " rows x " + weights[i].cols + " cols");
+	        System.out.println("Biases: " + biases[i].rows + " rows x " + biases[i].cols + " cols");
+	        System.out.println("Weights Gradients: " + weightsGradients[i].rows + " rows x " + weightsGradients[i].cols + " cols");
+	        System.out.println("Biases Gradients: " + biasesGradients[i].rows + " rows x " + biasesGradients[i].cols + " cols");
+	        System.out.println("Outputs: " + outputs[i].rows + " rows x " + outputs[i].cols + " cols");
+	        System.out.println("Activations: " + activations[i].rows + " rows x " + activations[i].cols + " cols");
+	        System.out.println();
+	    }
+	}
+	
 	
 	
 	/**
@@ -356,7 +645,7 @@ public class NeuralNetwork implements Serializable{
 	
 	/**
 	 * 
-	 * This function load the state of the previous neural network
+	 * This function loads the state of the previous neural network
 	 * 
 	 * @return void
 	 */
@@ -385,151 +674,8 @@ public class NeuralNetwork implements Serializable{
 		
 		return loadedNN;
 	}
-
-	
-	/**
-	 * 
-	 * This function is used to make a trained neural network make calculated guesses on given inputs and debugging it
-	 * 
-	 * @param inputs The inputs that the neural network need to do the guessing on
-	 * @param expectedOutputs The outputs that we expect from the neural network
-	 * @return A list of all the calculated guess of the neural network
-	 */
-	/*
-	public List<Double> nnGuessing(List<List<Double>> inputs, List<Double> expectedOutputs){
-		List<Double> calculatedOutputGuess = null;
-		if(NeuralNetwork.loadState() != null)
-		{
-			calculatedOutputGuess = new ArrayList<Double>();
-			int inputsNumber = inputs.size();
-			int wronGuess = 0;
-			
-			for (int k = 0; k < inputsNumber; ++k) {
-		        // Forward pass to make the trained neural network guess the output
-				calculatedOutputGuess.add(forward(inputs.get(k)).get(0));
-		    }
-			
-			for(int k = 0; k < expectedOutputs.size(); k++) {
-				if((Math.abs(calculatedOutputGuess.get(k)-expectedOutputs.get(k)) > 0.15)) {
-					wronGuess++;
-				}
-			}
-			
-			for(int i = 0; i<calculatedOutputGuess.size(); i++) {
-				System.out.print("\tExpected output: "+expectedOutputs.get(i).toString());
-    	        System.out.print(" | Actual output: "+ calculatedOutputGuess.get(i).toString());
-    	        System.out.println(" \tError: [ "+ Math.abs(expectedOutputs.get(i) - calculatedOutputGuess.get(i)) + " ]");
-			}
-			System.out.println(" \tThe percentage of error is: " + (double)wronGuess/expectedOutputs.size() * 100 + "%");
-			
-		} else
-			System.out.println("Impossibile fare il guessing da una rete neurale non trainata");
-		return calculatedOutputGuess;
-	}
-	*/
-	/**
-	 * 
-	 * This function is used to make a trained neural network make calculated guesses on given inputs
-	 * 
-	 * @param inputs The inputs that the neural network need to do the guessing on
-	 * @return A list of all the calculated guess of the neural network
-	 */
-	/**
-	public List<List<Double>> nnGuessing(List<List<Double>> inputs){
-		List<List<Double>> calculatedOutputGuess = null;
-		if(NeuralNetwork.loadState() != null)
-		{
-			calculatedOutputGuess = new ArrayList<List<Double>>();
-			int inputsNumber = inputs.size();
-			
-			for (int k = 0; k < inputsNumber; ++k) {
-		        // Forward pass to make the trained neural network guess the output
-				calculatedOutputGuess.add(forward(inputs.get(k)));
-		    }
-			
-		} else
-			System.out.println("Impossibile fare il guessing da una rete neurale non trainata");
-		return calculatedOutputGuess;
-	}
-	*/
 	
 	
-	
-	private void initializeMatrixRand(Matrix matrix, Random rand) {
-        for (int i = 0; i < matrix.rows; i++) {
-            for (int j = 0; j < matrix.cols; j++) {
-                matrix.elements[i][j] = rand.nextGaussian(); // Random values from a normal distribution
-            }
-        }
-    }
-	private void initializeMatrix(Matrix matrix, double d) {
-        for (int i = 0; i < matrix.rows; i++) {
-            for (int j = 0; j < matrix.cols; j++) {
-                matrix.elements[i][j] = d; // Random values from a normal distribution
-            }
-        }
-    }
-	public double getLearning_rate() {
-		return learningRate;
-	}
-
-	public void setLearning_rate(double learningRate) {
-		this.learningRate = learningRate;
-	}
-	
-    
-    private Matrix applyActivation(Matrix matrix, int iLayer) {
-        Matrix activated = new Matrix(matrix.rows, matrix.cols);
-        for (int i = 0; i < matrix.rows; i++) {
-            for (int j = 0; j < matrix.cols; j++) {
-            	if(iLayer==layerCount-1) {
-                    activated.elements[i][j] = activationFunction(matrix.elements[i][j], this.outputLayerAF);
-
-                }else {
-                	activated.elements[i][j] = activationFunction(matrix.elements[i][j], this.hiddenLayersAF);
-                }
-            }
-        }
-        return activated;
-    }
-    
-    private double sigmoid(double x) {
-        return 1.0 / (1.0 + Math.exp(-x));
-    }
-    private double relu(double x) {
-        return Math.max(0, x);
-    }
-
-    private double reluDerivative(double x) {
-        return x > 0 ? 1 : 0;
-    }
-	private double activationFunction(double x, String af){
-		switch(af) {
-			case "sig":
-				return sigmoid(x);
-			case "rel":
-				return relu(x);
-			default:
-				break;
-		}
-		
-		return x;
-	}
-    
-    private double AFDerivative(double x, String af) {
-    	
-    	switch(af) {
-		case "sig":
-			double sig = sigmoid(x);
-	        return sig * (1.0 - sig);
-		case "rel":
-			return reluDerivative(x);
-		default:
-			break;
-		}
-		
-		return 1;
-    }
 	
 	
 	public String getHiddenLayersAF() {
@@ -541,10 +687,23 @@ public class NeuralNetwork implements Serializable{
 	public String getOutputLayerAF() {
 		return outputLayerAF;
 	}
-	public void setOutputLayerAF(String outputLayerAF) {
-		this.outputLayerAF = outputLayerAF;
+	public void setOutputLayerAF(String af) {
+	    this.outputLayerAF = af;
+	    if(af.equals("softmax")) {
+	        this.lossFunction = "CCE"; // automatically set loss function to CCE
+	    }
 	}
-	
-	
-	
+	public String getLossFunction() {
+		return lossFunction;
+	}
+	public void setLossFunction(String lossFunction) {
+		this.lossFunction = lossFunction;
+	}
+	public double getLearning_rate() {
+		return learningRate;
+	}
+
+	public void setLearning_rate(double learningRate) {
+		this.learningRate = learningRate;
+	}
 }
