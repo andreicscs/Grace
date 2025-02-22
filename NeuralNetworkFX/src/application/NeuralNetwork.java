@@ -68,7 +68,6 @@ import java.util.Random;
 
 
 public class NeuralNetwork implements Serializable{
-
 	private static final long serialVersionUID = 972856922459233840L;
 	
 	int[] architecture;
@@ -79,6 +78,7 @@ public class NeuralNetwork implements Serializable{
     Matrix[] inputGradients;
     Matrix[] outputs;
     Matrix[] activations;
+
     int layerCount;
     String hiddenLayersAF;
     String outputLayerAF;
@@ -133,8 +133,7 @@ public class NeuralNetwork implements Serializable{
 		    initializeMatrix(outputs[i], 0);
 		    initializeMatrix(activations[i], 0);
 		}
-		this.learningRate=0.5d;
-		
+		this.learningRate=0.1d;
 		this.hiddenLayersAF="";
 		this.outputLayerAF="";
 		this.lossFunction="";
@@ -155,7 +154,6 @@ public class NeuralNetwork implements Serializable{
 		// Loop over training examples
 	    for (int i = 0; i < trainCount; ++i) {
 	        // Forward pass
-        	//System.out.println(i+" input[i] rows: " + trainingData.getSubMatrix(i, 0, 1, trainingData.getCols()-nOutputs).getRows() + " input[i] cols: " + trainingData.getSubMatrix(i, 0, 1, trainingData.getCols()-nOutputs).getCols());
 	        forward(trainingData.getSubMatrix(i, 0, 1, trainingData.getCols()-nOutputs));
 	        // Backwards pass
 	        backPropagation(trainingData.getSubMatrix(i, trainingData.getCols()-nOutputs, 1, nOutputs));
@@ -183,66 +181,104 @@ public class NeuralNetwork implements Serializable{
         }
     }
 	
-	/**
+    /**
+     *
+     * 
 	 * This function is used to propagate the error of the output layer to all the hidden layers
 	 * 
 	 * @param expectedOutput the output that we expect from the neural network
 	 * 
 	 */
     public void backPropagation(Matrix expectedOutput) {
-        for (int i = this.architecture.length - 1; i > 0; --i) {
-        	for (int j = 0; j < architecture[i]; ++j) {                    
-                double curNoutput = this.outputs[i].getElements()[0][j];
-            	double curNactivatedOutput = this.activations[i].getElements()[0][j];
-                double dActivationOnOutput=0;
-                double delta;
-                if (i == this.architecture.length - 1) { // Output layer
-                	if (numOutputs > 1) { // Multi-output
-                		delta = multipleOutputLossDerivative(curNactivatedOutput, expectedOutput.getElements()[0][j]); // because the af derivative and the loss derivative simplify each other only one calculation is needed
-                    }else { // Single output
-                		double dLoss_dY = lossDerivative(curNactivatedOutput, expectedOutput.getElements()[0][j]); // derivative of the loss function
-                		delta = dLoss_dY * AFDerivative(curNoutput, this.outputLayerAF);// delta = dLoss_dY * derivative of the activation function with the non-activated output as input
-                	}
-                } else { // Hidden layers
-                	dActivationOnOutput = AFDerivative(curNoutput, this.hiddenLayersAF); // derivative of the activation function with the non-activated output as input
-                	double prevLayerGradientSum = 0;
-                	for (int k = 0; k < architecture[i+1]; ++k) {
-                        prevLayerGradientSum += inputGradients[i + 1].getElements()[j][k]; // considering the sum of the next layer input of the neuron considered
-                    }
-                	delta = prevLayerGradientSum * dActivationOnOutput; // applying chain rule on the partial derivatives calculated up to now. Delta is the same for every weight of a given neuron.
-                }
-                // update gradients.
-                for (int k = 0; k < architecture[i - 1]; ++k) {
-                    double weightGradient = delta * this.activations[i - 1].getElements()[0][k]; // calculating the gradient using the derivative of l(S(Z))
-                    this.weightsGradients[i].getElements()[k][j] += weightGradient; // setting the weightGradient of the current neuron (swapped indexing)
-                    
-                    inputGradients[i].getElements()[k][j] = delta * weights[i].getElements()[k][j]; // storing the gradient of the input (swapped indexing)
-                }
-                // biasGradient = delta
-                this.biasesGradients[i].getElements()[0][j] += delta; // Updated indexing (biases are now stored as (1 × Output Neurons))
+        Matrix[] deltas = new Matrix[layerCount]; // Store deltas for all layers
+
+        deltas[layerCount - 1] = computeOutputLayerDeltas(expectedOutput);
+        
+        // propagate error backward
+        for (int i = layerCount - 1; i > 0; --i) {
+            Matrix weightGradients = Matrix.multiply(activations[i-1].transpose(), deltas[i]);  // compute weight gradients for layer i Weight gradients = activations[i-1]^T * deltas[i]
+            Matrix.addInPlace(weightsGradients[i], weightGradients);
+            
+            // compute bias gradients (sum over batch)
+            Matrix biasGradients = deltas[i];
+            Matrix.addInPlace(biasesGradients[i], biasGradients);
+            
+            // compute deltas for previous layer (if not input layer)
+            if (i > 1) {
+                Matrix inputGradients = Matrix.multiply(deltas[i], weights[i].transpose());	// input gradients = deltas[i] * weights[i]^T
+                Matrix activationDerivative = computeActivationDerivative(outputs[i-1], this.hiddenLayersAF);	// activation derivative = f'(outputs[i-1])
+                deltas[i-1] = Matrix.multiplyElementWise(inputGradients, activationDerivative); 	// deltas for previous layer = inputGradients ⊙ activationDerivative
             }
         }
     }
+    
+    /**
+     * Computes the deltas for the output layer.
+     *
+     * @param expectedOutput The expected output (true labels) for the batch.
+     * @return A matrix containing the deltas for the output layer.
+     */
+    private Matrix computeOutputLayerDeltas(Matrix expectedOutput) {
+        Matrix predicted = activations[layerCount - 1];
+        Matrix rawPredicted = outputs[layerCount - 1];
+    	Matrix curLayerDeltas;
+    	if (numOutputs > 1) { // Multi-output
+    		curLayerDeltas = multipleOutputLossDerivativeMatrix(predicted, expectedOutput); // because the af derivative and the loss derivative simplify each other only one calculation is needed
+        }else { // Single output
+    		Matrix dLoss_dY = computeLossDerivative(predicted, expectedOutput); // derivative of the loss function
+    		Matrix activationDerivative = computeActivationDerivative(rawPredicted, this.outputLayerAF);
+    		curLayerDeltas = Matrix.multiplyElementWise(dLoss_dY, activationDerivative); // delta = dLoss_dY * derivative of the activation function with the non-activated output as input
+    	}
+        return curLayerDeltas;
+    }
+    
+    /**
+     * Computes the derivative of the activation function for a given layer's outputs.
+     *
+     * @param outputs The outputs of the layer.
+     * @return A matrix containing the derivative of the activation function.
+     */
+    private Matrix computeActivationDerivative(Matrix outputs, String AF) {
+        Matrix derivative = new Matrix(outputs.rows, outputs.cols);
+        for (int i = 0; i < outputs.rows; i++) {
+            for (int j = 0; j < outputs.cols; j++) {
+                derivative.getElements()[i][j] = AFDerivative(outputs.getElements()[i][j], AF);
+            }
+        }
+        return derivative;
+    }
+    
+    /**
+     * Computes the derivative of the loss function for single output nn.
+     *
+     * @param outputs The outputs of the layer.
+     * @return A matrix containing the derivative of the loss function.
+     */
+    private Matrix computeLossDerivative(Matrix outputs, Matrix expectedOutputs) {
+        Matrix derivative = new Matrix(outputs.rows, outputs.cols);
+            for (int j = 0; j < outputs.cols; j++) {
+                derivative.getElements()[0][j] = lossDerivative(outputs.getElements()[0][j], expectedOutputs.getElements()[0][j]);
+            }
+        return derivative;
+    }
+    
 
 	/**
 	 * This function is used to update weight and biases using gradients calculated during back propagation process.
 	 * 
 	 * @param trainCount the number of the training iterations
 	 */
-	private void updateWeightsAndBiases(int trainCount) {
-	    for (int i = 1; i < this.architecture.length; ++i) {
-	        for (int k = 0; k < this.architecture[i - 1]; ++k) { // Iterate over input neurons
-	            for (int j = 0; j < this.architecture[i]; ++j) { // Iterate over output neurons
-	                this.weightsGradients[i].getElements()[k][j] /= trainCount;
-	                this.weights[i].getElements()[k][j] -= this.weightsGradients[i].getElements()[k][j] * learningRate;
-	                this.weightsGradients[i].getElements()[k][j] = 0d;
-	            } 
-	        }
-	        for (int j = 0; j < this.architecture[i]; ++j) {
-	            this.biasesGradients[i].getElements()[0][j] /= trainCount;
-	            this.biases[i].getElements()[0][j] -= this.biasesGradients[i].getElements()[0][j] * learningRate;
-	            this.biasesGradients[i].getElements()[0][j] = 0d;
-	        }
+	private void updateWeightsAndBiases(int batchSize) {
+		for (int i = 1; i < this.architecture.length; ++i) {
+	        // Update weights
+	        Matrix.scaleInPlace(weightsGradients[i], 1.0 / batchSize);
+	        Matrix.subtractInPlace(weights[i], weightsGradients[i].scale(learningRate));
+	        Matrix.fill(weightsGradients[i], 0.0); // Reset gradients
+	        
+	        // Update biases
+	        Matrix.scaleInPlace(biasesGradients[i], 1.0 / batchSize);
+	        Matrix.subtractInPlace(biases[i], biasesGradients[i].scale(learningRate));
+	        Matrix.fill(biasesGradients[i], 0.0); // Reset gradients
 	    }
 	}
 
@@ -276,6 +312,15 @@ public class NeuralNetwork implements Serializable{
 		switch(this.lossFunction) {
 		case "CCE":
 			return CCElossDerivative(output,expectedOutput);
+		default:
+            throw new IllegalArgumentException("Unsupported loss function: " + this.lossFunction);
+		}
+	}
+	
+	public Matrix multipleOutputLossDerivativeMatrix(Matrix output, Matrix expectedOutput) {
+		switch(this.lossFunction) {
+		case "CCE":
+			return CCElossDerivativeMatrix(output,expectedOutput);
 		default:
             throw new IllegalArgumentException("Unsupported loss function: " + this.lossFunction);
 		}
@@ -411,6 +456,7 @@ public class NeuralNetwork implements Serializable{
     }
     
     private Matrix softmax(Matrix matrix) {
+
         Matrix result = new Matrix(matrix.rows, matrix.cols);
         for (int i = 0; i < matrix.rows; i++) {
             double max = matrix.getElements()[i][0];
@@ -445,7 +491,7 @@ public class NeuralNetwork implements Serializable{
 	            double expected = labels.getElements()[i][j];
 
 	            // Ensure predicted values are valid probabilities
-	            if (predicted <= 0 || predicted > 1) {
+	            if (predicted < 0 || predicted > 1) {
 	                throw new IllegalArgumentException("Predictions must be probabilities (0 < p <= 1).");
 	            }
 
@@ -460,6 +506,11 @@ public class NeuralNetwork implements Serializable{
 	
 	public double CCElossDerivative(double predicted, double expected) {
 	    return predicted-expected;
+	}
+	public Matrix CCElossDerivativeMatrix(Matrix predicted, Matrix expected) {
+		// For softmax + categorical cross-entropy, delta = predicted - true label
+	    Matrix deltas = Matrix.subtract(predicted, expected);
+	    return deltas;
 	}
 	
     

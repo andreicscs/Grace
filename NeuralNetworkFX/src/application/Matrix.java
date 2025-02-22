@@ -1,7 +1,11 @@
 package application;
 
-public class Matrix {
-    int rows;
+import java.io.Serializable;
+
+public class Matrix implements Serializable{
+	private static final long serialVersionUID = 1L;
+	
+	int rows;
     int cols;
     double[][] elements;
 
@@ -51,7 +55,19 @@ public class Matrix {
             }
         }
     }
-    
+    public Matrix sumColumns() {
+        // The result matrix will have 1 row and as many columns as the original matrix
+        Matrix result = new Matrix(1, cols); 
+        for (int j = 0; j < cols; j++) {
+            double sum = 0;
+            for (int i = 0; i < rows; i++) {
+                sum += elements[i][j];
+            }
+            result.elements[0][j] = sum;
+        }
+
+        return result;
+    }
     public static Matrix multiply(Matrix a, Matrix b) {
         if (a.cols != b.rows) throw new IllegalArgumentException("Matrix dimensions do not match for multiplication.");
         Matrix result = new Matrix(a.rows, b.cols);
@@ -102,6 +118,20 @@ public class Matrix {
         
         return transposed;
     }
+    public Matrix transpose() {
+        int rows = this.getRows();
+        int cols = this.getCols();
+        Matrix transposed = new Matrix(cols, rows);
+        
+        // Transpose the matrix by swapping rows and columns
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                transposed.getElements()[j][i] = this.getElements()[i][j];
+            }
+        }
+        
+        return transposed;
+    }
     public void printMatrix() {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -111,6 +141,80 @@ public class Matrix {
         }
         System.out.println(); // Extra line for better readability
     }
+    
+    
+    public static void scaleInPlace(Matrix matrix, double scalar) {
+        for (int i = 0; i < matrix.rows; i++) {
+            for (int j = 0; j < matrix.cols; j++) {
+                matrix.elements[i][j] *= scalar;
+            }
+        }
+    }
 
+    public static void subtractInPlace(Matrix a, Matrix b) {
+        if (a.rows != b.rows || a.cols != b.cols) {
+            throw new IllegalArgumentException("Matrix dimensions must match for subtraction.");
+        }
+        for (int i = 0; i < a.rows; i++) {
+            for (int j = 0; j < a.cols; j++) {
+                a.elements[i][j] -= b.elements[i][j];
+            }
+        }
+    }
+    // Method to subtract another matrix from the current matrix
+    public static Matrix subtract(Matrix a, Matrix b) {
+        // Check if matrices have the same dimensions
+        if (a.rows != b.rows || a.cols != b.cols) {
+            throw new IllegalArgumentException("Matrices must have the same dimensions to subtract.");
+        }
+        Matrix result = new Matrix(a.rows, a.cols);
+        for (int i = 0; i < a.rows; i++) {
+            for (int j = 0; j < a.cols; j++) {
+                result.elements[i][j] = a.elements[i][j] - b.elements[i][j];
+            }
+        }
+        return result;
+    }
+    public static void addInPlace(Matrix a, Matrix b) {
+        if (a.rows != b.rows || a.cols != b.cols) {
+            throw new IllegalArgumentException("Matrix dimensions must match for addition.");
+        }
+        for (int i = 0; i < a.rows; i++) {
+            for (int j = 0; j < a.cols; j++) {
+                a.elements[i][j] += b.elements[i][j];
+            }
+        }
+    }
+    // Method for element-wise multiplication of two matrices
+    public static Matrix multiplyElementWise(Matrix a, Matrix b) {
+        // Check if matrices have the same dimensions
+        if (a.rows != b.rows || a.cols != b.cols) {
+            throw new IllegalArgumentException("Matrices must have the same dimensions for element-wise multiplication.");
+        }
+        Matrix result = new Matrix(a.rows, a.cols);
+        for (int i = 0; i < a.rows; i++) {
+            for (int j = 0; j < a.cols; j++) {
+                result.elements[i][j] = a.elements[i][j] * b.elements[i][j];
+            }
+        }
+        return result;
+    }
+    public Matrix scale(double scalar) {
+        Matrix result = new Matrix(rows, cols);
+        for (int i = 0; i < rows; i++) {
+            for (int j = 0; j < cols; j++) {
+                result.elements[i][j] = this.elements[i][j] * scalar;
+            }
+        }
+        return result;
+    }
+
+    public static void fill(Matrix matrix, double value) {
+        for (int i = 0; i < matrix.rows; i++) {
+            for (int j = 0; j < matrix.cols; j++) {
+                matrix.elements[i][j] = value;
+            }
+        }
+    }
     
 }

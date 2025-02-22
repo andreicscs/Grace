@@ -25,48 +25,61 @@ public class DrawingPanel extends StackPane{
 		thread1 = new Thread(new Runnable() {
 	            @Override
 				public void run() {
-	            	
-	            	int[] architecture= {2,4,1};
-	            	
-	            	NeuralNetwork scervelo = new NeuralNetwork(architecture);
-	            	//scervelo.debugMatrixDimensions();
-	            	
-	            	Matrix dataset = new Matrix(4, 3);
-	                dataset.setElements(new double[][] {
-	                	{0,0,0},
-	                	{0,1,1},
-	                	{1,0,1},
-	                	{1,1,0}
-	                });
-	            	
-	            	scervelo.setLearning_rate(0.1);
-	            	scervelo.setHiddenLayersAF("relu");
-	            	scervelo.setOutputLayerAF("sigmoid");
-	            	int nOutputs=1;
-	            	
-	            	
-	            	File nnData = new File("savedNN.dat");
-	            	
-	        		if(toTrain) {
-	        			double startTime = System.currentTimeMillis();
-	        			double endTime;
-	        			double elapsedTime;
-	        			
-	        			for(int i=0; i<10000000; ++i) {
-		        			scervelo.train(dataset, nOutputs, 64);
-		        			// DEBUG
-		        			if (i % 1000 == 0) {
-		        				endTime = System.currentTimeMillis();
-		        				elapsedTime = endTime - startTime;
-		        				startTime = endTime;
-		        		        double loss = scervelo.computeAverageLoss(dataset, nOutputs);
-		        		        double accuracy = scervelo.computeAccuracy(dataset, nOutputs);
-		        		        System.out.println("Iteration " + i + ",\t Cost: " + loss + ",\t Accuracy: " + accuracy +"%" + ",\t time (ms): " + elapsedTime);
-		        			}
-		        		}
-	        		}else if(nnData.exists()) {
-	        			scervelo = NeuralNetwork.loadState();
-	        		}
+	            	// Load and preprocess data
+	                String trainFilePath = "C:\\Users\\termi\\git\\Grace\\NeuralNetworkFX\\src\\mnist_train.csv";
+	                String testFilePath = "C:\\Users\\termi\\git\\Grace\\NeuralNetworkFX\\src\\mnist_test.csv";
+	                int numTrainSamples = 60000; // MNIST training set size
+	                int numTestSamples = 10000;  // MNIST test set size
+
+	                // Load and preprocess training data
+	                Matrix trainData = MNISTLoader.loadMNIST(trainFilePath, numTrainSamples);
+	                trainData = MNISTLoader.normalizeData(trainData);
+	                Matrix trainLabels = MNISTLoader.oneHotEncodeLabels(trainData);
+	                Matrix trainDataset = MNISTLoader.prepareDataset(trainData, trainLabels);
+
+	                // Load and preprocess test data
+	                Matrix testData = MNISTLoader.loadMNIST(testFilePath, numTestSamples);
+	                testData = MNISTLoader.normalizeData(testData);
+	                Matrix testLabels = MNISTLoader.oneHotEncodeLabels(testData);
+	                Matrix testDataset = MNISTLoader.prepareDataset(testData, testLabels);
+
+	                // Now you can use trainDataset and testDataset with your neural network
+	                // trainDataset: first 784 columns = inputs, last 10 columns = one-hot labels
+	                // testDataset: first 784 columns = inputs, last 10 columns = one-hot labels
+
+	                // Define network architecture
+	                int[] architecture = {784, 128, 64, 10};
+	                NeuralNetwork nn = new NeuralNetwork(architecture);
+	                nn.setHiddenLayersAF("relu");
+	                nn.setOutputLayerAF("softmax");
+	                nn.setLearning_rate(0.1);
+
+	                // Train the network
+	                int nOutputs=10;
+	                int batchSize = 32;
+	                int epochs = 30;
+
+	                for (int epoch = 0; epoch < epochs; epoch++) {
+	                    System.out.println("Epoch " + (epoch + 1));
+	                    
+	                    long startTime = System.nanoTime(); // Start timing
+	                    
+	                    nn.train(trainDataset, nOutputs, batchSize);
+	                    double trainLoss = nn.computeAverageLoss(trainDataset, nOutputs);
+	                    double trainAccuracy = nn.computeAccuracy(trainDataset, nOutputs);
+	                    System.out.println("Training Loss: " + trainLoss + ", Accuracy: " + trainAccuracy + "%");
+
+	                    double testLoss = nn.computeAverageLoss(testDataset, nOutputs);
+	                    double testAccuracy = nn.computeAccuracy(testDataset, nOutputs);
+	                    System.out.println("Test Loss: " + testLoss + ", Accuracy: " + testAccuracy + "%");
+	                    
+	                    long endTime = System.nanoTime(); // End timing
+	                    double elapsedTime = (endTime - startTime) / 1e9; // Convert nanoseconds to seconds
+	                    System.out.println("Epoch Time: " + elapsedTime + " seconds\n");
+	                }
+
+	                // Save the trained model
+	                nn.saveState();
 	        		
 	            }
            });
